@@ -187,29 +187,32 @@ class MainWindow(QMainWindow):
             try:
                 # Показываем прогресс
                 self.ui.progressBar.setVisible(True)
-                self.ui.progressBar.setValue(0)
+                self.ui.progressBar.setValue(
+                    50)  # Устанавливаем прогресс на 50%
                 self.ui.statusLabel.setText("Загрузка GPX...")
 
                 # Блокируем кнопки
                 self.set_buttons_enabled(False)
 
-                # Создаем рабочий поток
-                worker = GeoTagWorker(
-                    lambda gpx_path, **kwargs: parse_gpx_metadata(gpx_path),
-                    None, path, None
-                )
+                # Загружаем GPX напрямую (без потока)
+                metadata = parse_gpx_metadata(path)
 
-                # Подключаем сигналы
-                worker.signals.finished.connect(
-                    lambda: self.on_worker_finished("GPX загружен"))
-                worker.signals.result.connect(self.on_gpx_loaded)
-                worker.signals.error.connect(self.on_worker_error)
+                self.ui.lblStartUTC.setText(metadata['start'])
+                self.ui.lblEndUTC.setText(metadata['end'])
+                self.ui.lblStartLocal.setText(metadata['start_local'])
 
-                # Запускаем поток
-                self.thread_pool.start(worker)
+                self.logger.success(f"Загружен GPX: {os.path.basename(path)}")
 
                 # Анализируем GPX-файл для логов
                 self.analyze_gpx(path)
+
+                # Обновляем логи
+                self.refresh_logs()
+
+                # Разблокируем кнопки и скрываем прогресс
+                self.set_buttons_enabled(True)
+                self.ui.progressBar.setVisible(False)
+                self.ui.statusLabel.setText("GPX загружен")
 
             except Exception as e:
                 self.ui.progressBar.setVisible(False)
@@ -361,7 +364,7 @@ class MainWindow(QMainWindow):
 
             # Показываем прогресс
             self.ui.progressBar.setVisible(True)
-            self.ui.progressBar.setValue(0)
+            self.ui.progressBar.setValue(10)
             self.ui.statusLabel.setText("Создание тестовых данных...")
 
             # Блокируем кнопки
@@ -370,21 +373,44 @@ class MainWindow(QMainWindow):
             # Импортируем функцию создания тестовых данных
             from logic.test_utils import create_test_dataset
 
-            # Создаем рабочий поток
-            worker = GeoTagWorker(
-                create_test_dataset,
-                folder, None, None
-            )
+            # Создаем тестовые данные напрямую (без потока)
+            self.ui.progressBar.setValue(30)
+            result = create_test_dataset(folder)
+            self.ui.progressBar.setValue(80)
 
-            # Подключаем сигналы
-            worker.signals.finished.connect(
-                lambda: self.on_worker_finished("Тестовые данные созданы"))
-            worker.signals.result.connect(self.on_test_data_created)
-            worker.signals.error.connect(self.on_worker_error)
-            worker.signals.progress.connect(self.on_progress_update)
+            if result:
+                self.logger.success(
+                    f"Создано {len(result['gpx_paths'])} GPX-файлов")
+                self.logger.success(
+                    f"Создано {len(result['image_paths'])} тестовых изображений")
 
-            # Запускаем поток
-            self.thread_pool.start(worker)
+                # Автоматически загружаем тестовые данные
+                self.gpx_file_path = result['main_gpx_path']
+                self.image_folder = os.path.dirname(result['main_gpx_path'])
+
+                # Загружаем GPX
+                metadata = parse_gpx_metadata(self.gpx_file_path)
+                self.ui.lblStartUTC.setText(metadata['start'])
+                self.ui.lblEndUTC.setText(metadata['end'])
+                self.ui.lblStartLocal.setText(metadata['start_local'])
+
+                # Загружаем изображения
+                self.load_image_data(self.image_folder)
+
+                show_info(self, "Готово",
+                          "Тестовые данные созданы и загружены")
+            else:
+                self.logger.error("Не удалось создать тестовые данные")
+                show_error(self, "Ошибка",
+                           "Не удалось создать тестовые данные")
+
+            # Обновляем логи
+            self.refresh_logs()
+
+            # Разблокируем кнопки и скрываем прогресс
+            self.set_buttons_enabled(True)
+            self.ui.progressBar.setVisible(False)
+            self.ui.statusLabel.setText("Тестовые данные созданы")
 
         except Exception as e:
             self.ui.progressBar.setVisible(False)
