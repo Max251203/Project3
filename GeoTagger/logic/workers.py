@@ -1,89 +1,69 @@
-from PySide6.QtCore import QObject, Signal, QRunnable, QThreadPool, Slot, QThread
+from PySide6.QtCore import QObject, Signal, QThread
 import traceback
-import sys
 
 
+# === Общие сигналы потока ===
 class WorkerSignals(QObject):
-    """
-    Сигналы, доступные из рабочего потока
-    """
     started = Signal()
     finished = Signal()
     error = Signal(tuple)
     result = Signal(object)
-    progress = Signal(int)
+    request_confirm_gps = Signal(str, object)  # Только для GeoTagWorker
 
 
+# === Универсальный однократный поток ===
 class Worker(QThread):
-    """
-    Рабочий поток для выполнения задач в фоне
-    """
-
     def __init__(self, fn, *args, **kwargs):
-        super(Worker, self).__init__()
-        # Сохраняем аргументы функции
+        super().__init__()
         self.fn = fn
         self.args = args
         self.kwargs = kwargs
         self.signals = WorkerSignals()
 
-        # Добавляем callback для прогресса, если он есть в kwargs
-        if 'progress_callback' in kwargs:
-            self.kwargs['progress_callback'] = self.signals.progress
-
     def run(self):
-        """
-        Запускает рабочий поток
-        """
-        # Сигнал о начале работы
         self.signals.started.emit()
-
         try:
-            # Выполняем функцию
             result = self.fn(*self.args, **self.kwargs)
-        except Exception as e:
-            # Отправляем сигнал об ошибке
-            exctype, value = type(e), str(e)
-            traceback_str = traceback.format_exc()
-            self.signals.error.emit((exctype, value, traceback_str))
-        else:
-            # Отправляем результат
             self.signals.result.emit(result)
+        except Exception as e:
+            self.signals.error.emit((type(e), str(e), traceback.format_exc()))
         finally:
-            # Сигнал о завершении
             self.signals.finished.emit()
 
 
+# === Спец-поток геотеггинга с подтверждениями ===
 class GeoTagWorker(QThread):
-    """
-    Специализированный рабочий поток для геотеггинга
-    """
-
     def __init__(self, process_func, folder_path, gpx_path, time_correction):
-        super(GeoTagWorker, self).__init__()
-        self.process_func = process_func
-        self.folder_path = folder_path
-        self.gpx_path = gpx_path
-        self.time_correction = time_correction
+        super().__init__()
+        self.func = process_func
+        self.folder = folder_path
+        self.gpx = gpx_path
+        self.correction = time_correction
         self.signals = WorkerSignals()
 
     def run(self):
-        """
-        Запускает обработку геотегов
-        """
         self.signals.started.emit()
-
         try:
-            # Выполняем функцию обработки
-            result = self.process_func(
-                folder_path=self.folder_path,
-                gpx_path=self.gpx_path,
-                time_correction=self.time_correction,
-                progress_callback=self.signals.progress
+            result = self.func(
+                folder_path=self.folder,
+                gpx_path=self.gpx,
+                time_correction=self.correction,
+                confirm_callback=self.ask_confirmation
             )
             self.signals.result.emit(result)
         except Exception as e:
-            exctype, value = type(e), str(e)
-            self.signals.error.emit((exctype, value, traceback.format_exc()))
-        finally:
-            self.signals.finished.emit()
+            self.signals.error.emit((type(e), str(e), traceback.format_exc()))
+        self.signals.finished.emit()
+
+    def ask_confirmation(self, filename):
+        result_container = []
+
+        def callback(result):
+            result_container.append(result)
+
+        self.signals.request_confirm_gps.emit(filename, callback)
+
+        while not result_container:
+            self.msleep(100)
+
+        return result_container[0]

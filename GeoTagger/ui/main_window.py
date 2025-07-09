@@ -17,9 +17,9 @@ from PySide6.QtGui import (QBrush, QColor, QConicalGradient, QCursor,
                            QPalette, QPixmap, QRadialGradient, QTransform)
 from PySide6.QtWidgets import (QApplication, QFormLayout, QFrame, QGroupBox,
                                QHBoxLayout, QHeaderView, QLabel, QLineEdit,
-                               QMainWindow, QProgressBar, QPushButton, QSizePolicy,
-                               QSpacerItem, QTabWidget, QTableWidget, QTableWidgetItem,
-                               QTextEdit, QVBoxLayout, QWidget)
+                               QMainWindow, QPushButton, QSizePolicy, QSpacerItem,
+                               QTabWidget, QTableWidget, QTableWidgetItem, QTextEdit,
+                               QVBoxLayout, QWidget)
 import ui.resources_rc
 
 
@@ -39,7 +39,6 @@ class Ui_MainWindow(object):
         self.topPanel = QFrame(self.centralwidget)
         self.topPanel.setObjectName(u"topPanel")
         self.topPanel.setFrameShape(QFrame.StyledPanel)
-        self.topPanel.setFrameShadow(QFrame.Raised)
         self.horizontalLayoutTopInfo = QHBoxLayout(self.topPanel)
         self.horizontalLayoutTopInfo.setSpacing(8)
         self.horizontalLayoutTopInfo.setObjectName(u"horizontalLayoutTopInfo")
@@ -64,6 +63,7 @@ class Ui_MainWindow(object):
 
         self.editTimeCorrection = QLineEdit(self.topPanel)
         self.editTimeCorrection.setObjectName(u"editTimeCorrection")
+        self.editTimeCorrection.setMinimumHeight(32)
 
         self.horizontalLayoutTopInfo.addWidget(self.editTimeCorrection)
 
@@ -81,23 +81,11 @@ class Ui_MainWindow(object):
 
         self.horizontalLayoutTopInfo.addItem(self.horizontalSpacer)
 
-        self.statusLayout = QHBoxLayout()
-        self.statusLayout.setObjectName(u"statusLayout")
         self.statusLabel = QLabel(self.topPanel)
         self.statusLabel.setObjectName(u"statusLabel")
-        self.statusLabel.setMinimumWidth(100)
+        self.statusLabel.setMinimumWidth(200)
 
-        self.statusLayout.addWidget(self.statusLabel)
-
-        self.progressBar = QProgressBar(self.topPanel)
-        self.progressBar.setObjectName(u"progressBar")
-        self.progressBar.setMaximumSize(QSize(150, 16777215))
-        self.progressBar.setValue(0)
-        self.progressBar.setTextVisible(False)
-
-        self.statusLayout.addWidget(self.progressBar)
-
-        self.horizontalLayoutTopInfo.addLayout(self.statusLayout)
+        self.horizontalLayoutTopInfo.addWidget(self.statusLabel)
 
         self.verticalLayout.addWidget(self.topPanel)
 
@@ -105,9 +93,6 @@ class Ui_MainWindow(object):
         self.trackInfoGroup.setObjectName(u"trackInfoGroup")
         self.formLayout = QFormLayout(self.trackInfoGroup)
         self.formLayout.setObjectName(u"formLayout")
-        self.formLayout.setHorizontalSpacing(10)
-        self.formLayout.setVerticalSpacing(2)
-        self.formLayout.setContentsMargins(10, 5, 10, 5)
         self.lblStartUTCLabel = QLabel(self.trackInfoGroup)
         self.lblStartUTCLabel.setObjectName(u"lblStartUTCLabel")
 
@@ -177,12 +162,13 @@ class Ui_MainWindow(object):
 
         self.verticalLayoutLogs.addWidget(self.textEditLogs)
 
-        self.horizontalLayout = QHBoxLayout()
-        self.horizontalLayout.setObjectName(u"horizontalLayout")
-        self.horizontalSpacer_2 = QSpacerItem(
+        self.horizontalLayoutClearLogs = QHBoxLayout()
+        self.horizontalLayoutClearLogs.setObjectName(
+            u"horizontalLayoutClearLogs")
+        self.horizontalSpacer_Logs = QSpacerItem(
             40, 20, QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Minimum)
 
-        self.horizontalLayout.addItem(self.horizontalSpacer_2)
+        self.horizontalLayoutClearLogs.addItem(self.horizontalSpacer_Logs)
 
         self.btnClearLogs = QPushButton(self.tabLogs)
         self.btnClearLogs.setObjectName(u"btnClearLogs")
@@ -191,9 +177,9 @@ class Ui_MainWindow(object):
                       QIcon.Mode.Normal, QIcon.State.Off)
         self.btnClearLogs.setIcon(icon5)
 
-        self.horizontalLayout.addWidget(self.btnClearLogs)
+        self.horizontalLayoutClearLogs.addWidget(self.btnClearLogs)
 
-        self.verticalLayoutLogs.addLayout(self.horizontalLayout)
+        self.verticalLayoutLogs.addLayout(self.horizontalLayoutClearLogs)
 
         icon6 = QIcon()
         icon6.addFile(u":/icons/log.png", QSize(),
@@ -227,10 +213,11 @@ class Ui_MainWindow(object):
         self.btnLoadGPX.setText(QCoreApplication.translate(
             "MainWindow", u"\u0417\u0430\u0433\u0440\u0443\u0437\u0438\u0442\u044c GPX", None))
         self.editTimeCorrection.setPlaceholderText(QCoreApplication.translate(
-            "MainWindow", u"\u041f\u043e\u043f\u0440\u0430\u0432\u043a\u0430 \u0432\u0440\u0435\u043c\u0435\u043d\u0438 (\u0447:\u043c\u043c)", None))
+            "MainWindow", u"\u041f\u043e\u043f\u0440\u0430\u0432\u043a\u0430 \u0432\u0440\u0435\u043c\u0435\u043d\u0438 (\u00b1\u0447:\u043c\u043c)", None))
         self.btnStart.setText(QCoreApplication.translate(
             "MainWindow", u"\u0417\u0430\u043f\u0443\u0441\u043a", None))
-        self.statusLabel.setText("")
+        self.statusLabel.setText(QCoreApplication.translate(
+            "MainWindow", u"\u0421\u0442\u0430\u0442\u0443\u0441", None))
         self.trackInfoGroup.setTitle(QCoreApplication.translate(
             "MainWindow", u"\u0418\u043d\u0444\u043e\u0440\u043c\u0430\u0446\u0438\u044f \u043e \u0442\u0440\u0435\u043a\u0435", None))
         self.lblStartUTCLabel.setText(QCoreApplication.translate(
@@ -257,7 +244,7 @@ class Ui_MainWindow(object):
         self.tabWidgetMain.setTabText(self.tabWidgetMain.indexOf(
             self.tabFiles), QCoreApplication.translate("MainWindow", u"\u0424\u0430\u0439\u043b\u044b", None))
         self.textEditLogs.setPlaceholderText(QCoreApplication.translate(
-            "MainWindow", u"\u0417\u0434\u0435\u0441\u044c \u043e\u0442\u043e\u0431\u0440\u0430\u0436\u0430\u044e\u0442\u0441\u044f \u043b\u043e\u0433\u0438 \u0440\u0430\u0431\u043e\u0442\u044b \u043f\u0440\u043e\u0433\u0440\u0430\u043c\u043c\u044b...", None))
+            "MainWindow", u"\u0417\u0434\u0435\u0441\u044c \u043e\u0442\u043e\u0431\u0440\u0430\u0436\u0430\u044e\u0442\u0441\u044f \u043b\u043e\u0433\u0438 \u043f\u0440\u0438\u043b\u043e\u0436\u0435\u043d\u0438\u044f...", None))
         self.btnClearLogs.setText(QCoreApplication.translate(
             "MainWindow", u"\u041e\u0447\u0438\u0441\u0442\u0438\u0442\u044c \u043b\u043e\u0433\u0438", None))
         self.tabWidgetMain.setTabText(self.tabWidgetMain.indexOf(
