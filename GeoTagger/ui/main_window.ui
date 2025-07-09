@@ -1,0 +1,247 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ui version="4.0">
+ <class>MainWindow</class>
+ <widget class="QMainWindow" name="MainWindow">
+  <property name="geometry">
+   <rect>
+    <x>0</x>
+    <y>0</y>
+    <width>900</width>
+    <height>600</height>
+   </rect>
+  </property>
+  <property name="windowTitle">
+   <string>GeoTagger</string>
+  </property>
+  <property name="windowIcon">
+   <iconset resource="resources.qrc">
+    <normaloff>:/icons/app_icon.png</normaloff>:/icons/app_icon.png</iconset>
+  </property>
+  <widget class="QWidget" name="centralwidget">
+   <layout class="QVBoxLayout" name="verticalLayout">
+    <!-- Верхняя панель -->
+    <item>
+     <widget class="QFrame" name="topPanel">
+      <property name="frameShape">
+       <enum>QFrame::StyledPanel</enum>
+      </property>
+      <property name="frameShadow">
+       <enum>QFrame::Raised</enum>
+      </property>
+      <layout class="QHBoxLayout" name="horizontalLayoutTopInfo">
+       <property name="spacing">
+        <number>8</number>
+       </property>
+       <property name="leftMargin">
+        <number>10</number>
+       </property>
+       <property name="topMargin">
+        <number>5</number>
+       </property>
+       <property name="rightMargin">
+        <number>10</number>
+       </property>
+       <property name="bottomMargin">
+        <number>5</number>
+       </property>
+       <item>
+        <widget class="QPushButton" name="btnSelectFolder">
+         <property name="text">
+          <string>Выбрать папку</string>
+         </property>
+         <property name="icon">
+          <iconset resource="resources.qrc">
+           <normaloff>:/icons/folder.png</normaloff>:/icons/folder.png</iconset>
+         </property>
+        </widget>
+       </item>
+       <item>
+        <widget class="QPushButton" name="btnLoadGPX">
+         <property name="text">
+          <string>Загрузить GPX</string>
+         </property>
+         <property name="icon">
+          <iconset resource="resources.qrc">
+           <normaloff>:/icons/gpx_file.png</normaloff>:/icons/gpx_file.png</iconset>
+         </property>
+        </widget>
+       </item>
+       <item>
+        <widget class="QLineEdit" name="editTimeCorrection">
+         <property name="placeholderText">
+          <string>Поправка времени (ч:мм)</string>
+         </property>
+        </widget>
+       </item>
+       <item>
+        <widget class="QPushButton" name="btnStart">
+         <property name="text">
+          <string>Запуск</string>
+         </property>
+         <property name="icon">
+          <iconset resource="resources.qrc">
+           <normaloff>:/icons/run.png</normaloff>:/icons/run.png</iconset>
+         </property>
+        </widget>
+       </item>
+       <item>
+        <spacer name="horizontalSpacer">
+         <property name="orientation">
+          <enum>Qt::Horizontal</enum>
+         </property>
+         <property name="sizeHint" stdset="0">
+          <size>
+           <width>40</width>
+           <height>20</height>
+          </size>
+         </property>
+        </spacer>
+       </item>
+      </layout>
+     </widget>
+    </item>
+    
+    <!-- Информация о треке -->
+    <item>
+     <layout class="QHBoxLayout" name="infoLayout">
+      <item>
+       <widget class="QLabel" name="lblStartUTC">
+        <property name="text">
+         <string>Начало трека (UTC): -</string>
+        </property>
+       </widget>
+      </item>
+      <item>
+       <widget class="QLabel" name="lblEndUTC">
+        <property name="text">
+         <string>Конец трека (UTC): -</string>
+        </property>
+       </widget>
+      </item>
+      <item>
+       <widget class="QLabel" name="lblStartLocal">
+        <property name="text">
+         <string>Местное время старта: -</string>
+        </property>
+       </widget>
+      </item>
+     </layout>
+    </item>
+    
+    <!-- Основные вкладки -->
+    <item>
+     <widget class="QTabWidget" name="tabWidgetMain">
+      <property name="currentIndex">
+       <number>0</number>
+      </property>
+      <property name="iconSize">
+       <size>
+        <width>24</width>
+        <height>24</height>
+       </size>
+      </property>
+      
+      <!-- Вкладка Файлы -->
+      <widget class="QWidget" name="tabFiles">
+       <attribute name="icon">
+        <iconset resource="resources.qrc">
+         <normaloff>:/icons/files.png</normaloff>:/icons/files.png</iconset>
+       </attribute>
+       <attribute name="title">
+        <string>Файлы</string>
+       </attribute>
+       <layout class="QVBoxLayout" name="verticalLayoutFiles">
+        <item>
+         <widget class="QTableWidget" name="tableFiles">
+          <column>
+           <property name="text">
+            <string>Файл</string>
+           </property>
+          </column>
+          <column>
+           <property name="text">
+            <string>Время съёмки</string>
+           </property>
+          </column>
+          <column>
+           <property name="text">
+            <string>Координаты</string>
+           </property>
+          </column>
+         </widget>
+        </item>
+       </layout>
+      </widget>
+      
+      <!-- Вкладка Логи -->
+      <widget class="QWidget" name="tabLogs">
+       <attribute name="icon">
+        <iconset resource="resources.qrc">
+         <normaloff>:/icons/log.png</normaloff>:/icons/log.png</iconset>
+       </attribute>
+       <attribute name="title">
+        <string>Логи</string>
+       </attribute>
+       <layout class="QVBoxLayout" name="verticalLayoutLogs">
+        <item>
+         <widget class="QTextEdit" name="textEditLogs">
+          <property name="readOnly">
+           <bool>true</bool>
+          </property>
+          <property name="placeholderText">
+           <string>Здесь отображаются логи работы программы...</string>
+          </property>
+         </widget>
+        </item>
+        <item>
+         <layout class="QHBoxLayout" name="horizontalLayout">
+          <item>
+           <spacer name="horizontalSpacer_2">
+            <property name="orientation">
+             <enum>Qt::Horizontal</enum>
+            </property>
+            <property name="sizeHint" stdset="0">
+             <size>
+              <width>40</width>
+              <height>20</height>
+             </size>
+            </property>
+           </spacer>
+          </item>
+          <item>
+           <widget class="QPushButton" name="btnClearLogs">
+            <property name="text">
+             <string>Очистить логи</string>
+            </property>
+            <property name="icon">
+             <iconset resource="resources.qrc">
+              <normaloff>:/icons/clear.png</normaloff>:/icons/clear.png</iconset>
+            </property>
+           </widget>
+          </item>
+         </layout>
+        </item>
+       </layout>
+      </widget>
+      
+      <!-- Вкладка Настройки -->
+      <widget class="QWidget" name="tabSettings">
+       <attribute name="icon">
+        <iconset resource="resources.qrc">
+         <normaloff>:/icons/settings.png</normaloff>:/icons/settings.png</iconset>
+       </attribute>
+       <attribute name="title">
+        <string>Настройки</string>
+       </attribute>
+       <layout class="QVBoxLayout" name="verticalLayoutSettings"/>
+      </widget>
+     </widget>
+    </item>
+   </layout>
+  </widget>
+ </widget>
+ <resources>
+  <include location="resources.qrc"/>
+ </resources>
+ <connections/>
+</ui>

@@ -1,0 +1,29 @@
+<RCC>
+  <qresource prefix="/">
+    <!-- Основные иконки -->
+    <file alias="icons/app_icon.png">icons/app_icon.png</file>
+    <file alias="icons/folder.png">icons/folder.png</file>
+    <file alias="icons/gpx_file.png">icons/gpx_file.png</file>
+    <file alias="icons/run.png">icons/run.png</file>
+    <file alias="icons/clear.png">icons/clear.png</file>
+    
+    <!-- Иконки вкладок -->
+    <file alias="icons/files.png">icons/files.png</file>
+    <file alias="icons/log.png">icons/log.png</file>
+    <file alias="icons/settings.png">icons/settings.png</file>
+    
+    <!-- Иконки логов -->
+    <file alias="icons/info.png">icons/info.png</file>
+    <file alias="icons/warning.png">icons/warning.png</file>
+    <file alias="icons/error.png">icons/error.png</file>
+    <file alias="icons/success.png">icons/success.png</file>
+    
+    <!-- Иконки тем -->
+    <file alias="icons/dark.png">icons/dark.png</file>
+    <file alias="icons/light.png">icons/light.png</file>
+    
+    <!-- Стили -->
+    <file alias="style/style_dark.qss">style_dark.qss</file>
+    <file alias="style/style_light.qss">style_light.qss</file>
+  </qresource>
+</RCC>

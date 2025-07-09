@@ -1,0 +1,6 @@
+PySide6
+gpxpy
+piexif
+timezonefinder
+pytz
+tzlocal
