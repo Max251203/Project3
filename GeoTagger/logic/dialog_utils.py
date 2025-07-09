@@ -23,7 +23,7 @@ def confirm_overwrite_gps(filename: str) -> str:
     skip = dlg.addButton("Пропустить", QMessageBox.RejectRole)
     overwrite_all = dlg.addButton("Перезаписать все", QMessageBox.YesRole)
     skip_all = dlg.addButton("Пропустить все", QMessageBox.NoRole)
-    cancel = dlg.addButton("Отмена", QMessageBox.DestructiveRole)
+    cancel = dlg.addButton("Стоп", QMessageBox.DestructiveRole)
 
     dlg.exec()
     if dlg.clickedButton() == overwrite:

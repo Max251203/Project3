@@ -73,7 +73,7 @@
        <!-- СТАТУС БЕЗ ПРОГРЕСС-БАРА -->
        <item>
         <widget class="QLabel" name="statusLabel">
-         <property name="text"><string>Статус</string></property>
+         <property name="text"><string></string></property>
          <property name="minimumWidth"><number>200</number></property>
         </widget>
        </item>

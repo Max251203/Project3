@@ -1,10 +1,11 @@
 import os
+import subprocess
 from datetime import datetime, timedelta
 import gpxpy
 import piexif
-import subprocess
 
 from logic.time_sync import get_datetime_from_image
+from logic.exif_utils import find_exiftool
 from logic.file_manager import SUPPORTED_EXTENSIONS
 from logic.dialog_utils import confirm_overwrite_gps
 from logic.logger import get_logger
@@ -22,29 +23,25 @@ def process_images(folder_path: str, gpx_path: str, time_correction: str = "0:00
     if not gpx_data:
         raise Exception("GPX-файл не содержит координат")
 
-    files = [
-        f for f in os.listdir(folder_path)
-        if f.lower().endswith(SUPPORTED_EXTENSIONS)
-    ]
+    files = [f for f in os.listdir(
+        folder_path) if f.lower().endswith(SUPPORTED_EXTENSIONS)]
     total = len(files)
     updated = 0
+    global_action = None  # overwrite_all, skip_all
 
     logger.info(f"Найдено {total} изображений для обработки")
 
-    global_action = None  # overwrite_all, skip_all, None
-
-    for i, filename in enumerate(files):
+    for filename in files:
         filepath = os.path.join(folder_path, filename)
-
-        # Получаем дату/время съёмки
         dt_original = get_datetime_from_image(filepath)
+
         if not dt_original:
             logger.warning(f"{filename} — отсутствует дата съёмки")
             continue
 
         corrected_dt = dt_original + corrected_delta
-
         lat, lon = find_matching_coordinate(gpx_data, corrected_dt)
+
         if lat is None or lon is None:
             logger.warning(
                 f"{filename} — координаты не найдены на {corrected_dt}")
@@ -54,7 +51,6 @@ def process_images(folder_path: str, gpx_path: str, time_correction: str = "0:00
 
         has_gps = has_gps_in_exif(filepath)
 
-        # === ЛОГИКА СПРАШИВАНИЯ ===
         if has_gps:
             if global_action is None:
                 if confirm_callback:
@@ -64,7 +60,7 @@ def process_images(folder_path: str, gpx_path: str, time_correction: str = "0:00
 
                 if action == "cancel":
                     logger.warning("Пользователь отменил обработку")
-                    break
+                    return updated, total
                 elif action == "overwrite":
                     pass
                 elif action == "skip":
@@ -87,7 +83,6 @@ def process_images(folder_path: str, gpx_path: str, time_correction: str = "0:00
 
 
 def parse_time_correction(text: str) -> timedelta:
-    """Формат ввода: ±HH:MM"""
     try:
         sign = 1
         if text.startswith("-"):
@@ -103,7 +98,6 @@ def parse_time_correction(text: str) -> timedelta:
 
 
 def parse_gpx(gpx_path: str) -> list:
-    """Возвращает: список {'time', 'lat', 'lon'}"""
     try:
         with open(gpx_path, "r", encoding="utf-8") as f:
             gpx = gpxpy.parse(f)
@@ -118,7 +112,6 @@ def parse_gpx(gpx_path: str) -> list:
                             "lat": point.latitude,
                             "lon": point.longitude
                         })
-
         logger.info(f"Извлечено {len(points)} точек из GPX")
         return points
     except Exception as e:
@@ -127,43 +120,31 @@ def parse_gpx(gpx_path: str) -> list:
 
 
 def find_matching_coordinate(gpx_data: list, timestamp: datetime):
-    """Интерполяция или ближайшая точка"""
     for i in range(len(gpx_data) - 1):
         pt1, pt2 = gpx_data[i], gpx_data[i + 1]
         if pt1["time"] <= timestamp <= pt2["time"]:
             total_diff = (pt2["time"] - pt1["time"]).total_seconds()
-            if total_diff == 0:
-                return pt1["lat"], pt1["lon"]
             factor = (timestamp - pt1["time"]).total_seconds() / total_diff
             lat = pt1["lat"] + (pt2["lat"] - pt1["lat"]) * factor
             lon = pt1["lon"] + (pt2["lon"] - pt1["lon"]) * factor
             return lat, lon
-
-    # Если нет идеально подходящей точки
     if gpx_data:
         closest = min(gpx_data, key=lambda p: abs(
             (p["time"] - timestamp).total_seconds()))
         diff_sec = abs((closest["time"] - timestamp).total_seconds())
-
-        if diff_sec < 3600:  # допустим до 1 часа разницы
+        if diff_sec < 3600:
             logger.warning(
                 f"Использована ближайшая точка ({diff_sec:.0f} сек)")
             return closest["lat"], closest["lon"]
-
     return None, None
 
 
 def deg_to_dms_rational(deg_float):
-    """Преобразует float -> DMS -> EXIF rational"""
     deg = int(deg_float)
     min_float = (deg_float - deg) * 60
     minute = int(min_float)
     sec = round((min_float - minute) * 60 * 10000)
-    return (
-        (deg, 1),
-        (minute, 1),
-        (sec, 10000)
-    )
+    return ((deg, 1), (minute, 1), (sec, 10000))
 
 
 def write_gps_to_exif(filepath: str, lat: float, lon: float) -> bool:
@@ -194,12 +175,11 @@ def write_gps_to_jpeg(filepath: str, lat: float, lon: float) -> bool:
 
 
 def write_gps_with_exiftool(filepath: str, lat: float, lon: float) -> bool:
+    exiftool = find_exiftool()
+    if not exiftool:
+        logger.error("ExifTool не найден для записи в ARW")
+        return False
     try:
-        exiftool = find_exiftool()
-        if not exiftool:
-            logger.error("ExifTool не найден")
-            return False
-
         cmd = [
             exiftool,
             f"-GPSLatitude={abs(lat)}",
@@ -211,13 +191,12 @@ def write_gps_with_exiftool(filepath: str, lat: float, lon: float) -> bool:
         ]
         result = subprocess.run(
             cmd, capture_output=True, text=True, creationflags=subprocess.CREATE_NO_WINDOW)
-
         if result.returncode != 0:
-            logger.error(f"ExifTool ошибка: {result.stderr}")
+            logger.error(f"ExifTool ошибка: {result.stderr.strip()}")
             return False
         return True
     except Exception as e:
-        logger.error(f"Ошибка при записи в ARW {filepath}: {e}")
+        logger.error(f"Ошибка при записи в ARW: {e}")
         return False
 
 
@@ -226,18 +205,18 @@ def has_gps_in_exif(filepath: str) -> bool:
     if ext in [".jpg", ".jpeg"]:
         try:
             exif_dict = piexif.load(filepath)
-            gps = exif_dict.get("GPS")
-            return bool(gps)
+            return bool(exif_dict.get("GPS"))
         except Exception:
             return False
     elif ext == ".arw":
+        exiftool = find_exiftool()
+        if not exiftool:
+            return False
         try:
-            exiftool = find_exiftool()
-            if not exiftool:
-                return False
-            cmd = [exiftool, "-GPSLatitude", "-GPSLongitude", "-s", filepath]
             result = subprocess.run(
-                cmd, capture_output=True, text=True, creationflags=subprocess.CREATE_NO_WINDOW)
+                [exiftool, "-GPSLatitude", "-GPSLongitude", "-s", filepath],
+                capture_output=True, text=True, creationflags=subprocess.CREATE_NO_WINDOW
+            )
             return "GPSLatitude" in result.stdout and "GPSLongitude" in result.stdout
         except Exception:
             return False
@@ -245,9 +224,25 @@ def has_gps_in_exif(filepath: str) -> bool:
 
 
 def find_exiftool():
+    import os
+    from logic.logger import get_logger
+    logger = get_logger()
+
     project_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+
     for root, dirs, files in os.walk(project_dir):
         for name in ["exiftool.exe", "exiftool(-k).exe", "exiftool"]:
             if name in files:
                 return os.path.join(root, name)
-    return "exiftool"  # попытка через PATH — если установлен
+
+    # Проверка в PATH
+    try:
+        result = subprocess.run(["exiftool", "-ver"],
+                                capture_output=True, text=True, check=True,
+                                creationflags=subprocess.CREATE_NO_WINDOW)
+        logger.info(f"ExifTool найден в PATH (v{result.stdout.strip()})")
+        return "exiftool"
+    except Exception as e:
+        logger.error(
+            "ExifTool не найден! Убедитесь, что в папке с программой есть exiftool.exe")
+        return None

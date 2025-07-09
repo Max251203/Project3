@@ -5,6 +5,7 @@ from PySide6.QtWidgets import (
     QApplication, QMainWindow, QFileDialog, QHeaderView, QTableWidgetItem
 )
 from PySide6.QtCore import QFile, QTextStream
+from PySide6.QtGui import QIcon
 
 # UI
 from ui.main_window import Ui_MainWindow
@@ -13,12 +14,13 @@ import ui.resources_rc
 
 # Логика
 from logic import file_manager
-from logic.exif_handler import process_images, find_exiftool
+from logic.exif_handler import process_images
 from logic.gpx_parser import parse_gpx_metadata
 from logic.logger import get_logger
 from logic.dialog_utils import show_error, show_info, show_warning
-from logic.workers import Worker      # универсальный
-from logic.workers import GeoTagWorker  # спец. для геотаггинга
+from logic.workers import Worker, GeoTagWorker
+from logic.config import load_exiftool_path_from_file, get_exiftool_path
+from logic.exif_utils import find_exiftool
 
 
 class MainWindow(QMainWindow):
@@ -32,8 +34,7 @@ class MainWindow(QMainWindow):
         self.gpx_file_path = None
         self.logger = get_logger()
         self.current_theme = "dark"
-
-        self.active_threads = []  # 👉 Храним активные потоки
+        self.active_threads = []
 
         self.setup_ui()
         self.connect_signals()
@@ -45,22 +46,30 @@ class MainWindow(QMainWindow):
         self.setWindowTitle("GeoTagger")
         self.setMinimumSize(900, 600)
         self.ui.tableFiles.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
+        self.ui.statusLabel.setText("")
 
-        # Удаляем прогресс-бар визуально и из логики
-        if hasattr(self.ui, 'progressBar'):
-            self.ui.progressBar.deleteLater()
-            self.ui.progressBar = None
-
-        # Увеличим поле поправки
-        self.ui.editTimeCorrection.setMinimumHeight(32)
-        self.ui.editTimeCorrection.setMinimumWidth(180)
-
-        # Настройки
         self.settings_tab = SettingsTab(self)
         self.ui.verticalLayoutSettings.addWidget(self.settings_tab)
 
-        exiftool = find_exiftool()
-        self.settings_tab.update_exiftool_status(exiftool)
+        # ✅ Загружаем путь из файла (если есть)
+        load_exiftool_path_from_file()
+        path = get_exiftool_path()
+
+        if path and os.path.exists(path):
+            self.settings_tab.update_exiftool_status(path)
+            self.logger.info(f"ExifTool готов к работе: {path}")
+            self.update_status("")
+        else:
+            from logic.exif_utils import find_exiftool
+            found = find_exiftool()
+            self.settings_tab.update_exiftool_status(found)
+
+            if not found:
+                self.logger.error(
+                    "ExifTool не найден. Обработка RAW будет невозможна.")
+                self.update_status("❗ ExifTool не найден")
+            else:
+                self.update_status("")
 
     def connect_signals(self):
         self.ui.btnSelectFolder.clicked.connect(self.select_folder)
@@ -103,7 +112,7 @@ class MainWindow(QMainWindow):
         thread.quit()
         thread.wait()
 
-    # ---------------- Загрузка изображений ----------------
+    # ---------- Загрузка изображений ----------
     def select_folder(self):
         folder = QFileDialog.getExistingDirectory(
             self, "Выберите папку с изображениями")
@@ -137,15 +146,14 @@ class MainWindow(QMainWindow):
         self.update_status("Изображения загружены")
         self.refresh_logs()
 
-    # ---------------- Загрузка GPX ----------------
+    # ------------ Загрузка GPX ------------
     def load_gpx(self):
         path, _ = QFileDialog.getOpenFileName(
             self, "Выберите GPX-файл", filter="*.gpx")
         if not path:
             return
-
         self.gpx_file_path = path
-        self.update_status("Загрузка GPX-файла...")
+        self.update_status("Загрузка GPX...")
         self.set_buttons_enabled(False)
 
         worker = Worker(parse_gpx_metadata, path)
@@ -161,10 +169,10 @@ class MainWindow(QMainWindow):
         self.ui.lblEndUTC.setText(metadata["end"])
         self.ui.lblStartLocal.setText(metadata["start_local"])
         self.logger.success("GPX-файл успешно загружен")
-        self.update_status("GPX-файл загружен")
+        self.update_status("GPX загружен")
         self.refresh_logs()
 
-    # ---------------- Обработка геотегов ----------------
+    # ---------- Обработка геометок ----------
     def run_geotagging(self):
         if not self.image_folder or not self.gpx_file_path:
             show_warning(self, "Ошибка",
@@ -177,7 +185,6 @@ class MainWindow(QMainWindow):
         self.refresh_logs()
         self.set_buttons_enabled(False)
 
-        from logic.workers import GeoTagWorker
         self.geo_worker = GeoTagWorker(
             process_func=process_images,
             folder_path=self.image_folder,
@@ -188,20 +195,25 @@ class MainWindow(QMainWindow):
 
         self.geo_worker.signals.result.connect(self.on_geotagging_done)
         self.geo_worker.signals.error.connect(self.on_worker_error)
+        self.geo_worker.signals.request_confirm_gps.connect(
+            self.confirm_overwrite_dialog)
         self.geo_worker.signals.finished.connect(
             lambda: self.cleanup_thread(self.geo_worker))
         self.geo_worker.signals.finished.connect(
             lambda: self.set_buttons_enabled(True))
-        self.geo_worker.signals.request_confirm_gps.connect(
-            self.confirm_overwrite_dialog)
 
         self.geo_worker.start()
+
+    def confirm_overwrite_dialog(self, filename, callback):
+        from logic.dialog_utils import confirm_overwrite_gps
+        result = confirm_overwrite_gps(filename)
+        callback(result)
 
     def on_geotagging_done(self, result):
         updated, total = result
         msg = f"Геометки добавлены в {updated} из {total} файлов"
         self.logger.success(msg)
-        self.update_status("Геометки добавлены")
+        self.update_status("Обработка завершена")
         show_info(self, "Готово", msg)
         self.refresh_logs()
         self.load_images(self.image_folder)
@@ -214,14 +226,13 @@ class MainWindow(QMainWindow):
         self.refresh_logs()
         self.set_buttons_enabled(True)
 
-    # ---------------- Тестовые данные ----------------
+    # ------------ Генерация тестов ------------
     def create_test_data(self):
         from logic.test_utils import create_test_dataset
         folder = QFileDialog.getExistingDirectory(
             self, "Папка для тестовых данных")
         if not folder:
             return
-
         self.update_status("Создание тестов...")
         self.set_buttons_enabled(False)
 
@@ -243,15 +254,9 @@ class MainWindow(QMainWindow):
             self.logger.success("Тесты созданы")
             show_info(self, "Готово", "Тестовые данные созданы")
             self.refresh_logs()
-
         except Exception as e:
             self.on_worker_error((type(e), str(e), ""))
         self.set_buttons_enabled(True)
-
-    def confirm_overwrite_dialog(self, filename, callback):
-        from logic.dialog_utils import confirm_overwrite_gps
-        result = confirm_overwrite_gps(filename)
-        callback(result)
 
 
 if __name__ == "__main__":

@@ -216,8 +216,7 @@ class Ui_MainWindow(object):
             "MainWindow", u"\u041f\u043e\u043f\u0440\u0430\u0432\u043a\u0430 \u0432\u0440\u0435\u043c\u0435\u043d\u0438 (\u00b1\u0447:\u043c\u043c)", None))
         self.btnStart.setText(QCoreApplication.translate(
             "MainWindow", u"\u0417\u0430\u043f\u0443\u0441\u043a", None))
-        self.statusLabel.setText(QCoreApplication.translate(
-            "MainWindow", u"\u0421\u0442\u0430\u0442\u0443\u0441", None))
+        self.statusLabel.setText("")
         self.trackInfoGroup.setTitle(QCoreApplication.translate(
             "MainWindow", u"\u0418\u043d\u0444\u043e\u0440\u043c\u0430\u0446\u0438\u044f \u043e \u0442\u0440\u0435\u043a\u0435", None))
         self.lblStartUTCLabel.setText(QCoreApplication.translate(
