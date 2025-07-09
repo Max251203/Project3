@@ -78,6 +78,24 @@ QFrame#topPanel {
     margin-bottom: 5px;
 }
 
+/* === Информация о треке === */
+QGroupBox#trackInfoGroup {
+    background-color: #e8e8e8;
+    border: 1px solid #4a90e2;
+    border-radius: 5px;
+    padding: 5px;
+    margin-bottom: 5px;
+}
+
+QGroupBox#trackInfoGroup QLabel {
+    padding: 2px;
+}
+
+QLabel[labelType="title"] {
+    color: #4a90e2;
+    font-weight: bold;
+}
+
 /* === QComboBox === */
 QComboBox {
     padding: 2px;
@@ -225,4 +243,21 @@ QProgressBar::chunk {
         stop:1 #5a9ae2
     );
     border-radius: 4px;
+}
+
+/* === Статус в верхней панели === */
+#statusLabel {
+    color: #333333;
+    font-weight: bold;
+    padding-right: 10px;
+}
+
+/* === Метки информации о треке === */
+#lblStartUTCLabel, #lblEndUTCLabel, #lblStartLocalLabel {
+    color: #4a90e2;
+    font-weight: bold;
+}
+
+#lblStartUTC, #lblEndUTC, #lblStartLocal {
+    color: #333333;
 }

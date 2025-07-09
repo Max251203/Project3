@@ -1,9 +1,10 @@
 import os
+import sys  # Добавляем импорт sys в начало файла
 from datetime import datetime, timedelta
 import gpxpy
 import piexif
 from PySide6.QtWidgets import QMessageBox
-import exiftool
+import subprocess
 
 from logic.time_sync import get_datetime_from_image
 from logic.file_manager import SUPPORTED_EXTENSIONS
@@ -14,7 +15,7 @@ from logic.logger import get_logger
 logger = get_logger()
 
 
-def process_images(folder_path: str, gpx_path: str, time_correction: str = "0:00") -> tuple[int, int]:
+def process_images(folder_path: str, gpx_path: str, time_correction: str = "0:00", progress_callback=None) -> tuple[int, int]:
     """
     Основная функция: обрабатывает изображения, сопоставляет по времени, записывает координаты
     Возвращает: (сколько обновлено, всего)
@@ -41,7 +42,11 @@ def process_images(folder_path: str, gpx_path: str, time_correction: str = "0:00
 
     logger.info(f"Найдено {total} файлов для обработки")
 
-    for filename in files:
+    for i, filename in enumerate(files):
+        # Обновляем прогресс
+        if progress_callback:
+            progress_callback.emit(int((i / total) * 100))
+
         filepath = os.path.join(folder_path, filename)
         dt_original = get_datetime_from_image(filepath)
 
@@ -91,6 +96,10 @@ def process_images(folder_path: str, gpx_path: str, time_correction: str = "0:00
                 f"Координаты записаны в {filename}: {lat:.6f}, {lon:.6f}")
         else:
             logger.error(f"Не удалось записать координаты в {filename}")
+
+    # Финальный прогресс
+    if progress_callback:
+        progress_callback.emit(100)
 
     logger.success(
         f"Обработка завершена: обновлено {updated} из {total} файлов")
@@ -221,16 +230,30 @@ def write_gps_to_jpeg(filepath: str, lat: float, lon: float) -> bool:
 def write_gps_with_exiftool(filepath: str, lat: float, lon: float) -> bool:
     """Запись GPS в ARW через exiftool"""
     try:
-        with exiftool.ExifTool(executable="exiftool.exe") as et:
-            cmds = [
-                f"-GPSLatitude={abs(lat)}",
-                f"-GPSLatitudeRef={'N' if lat >= 0 else 'S'}",
-                f"-GPSLongitude={abs(lon)}",
-                f"-GPSLongitudeRef={'E' if lon >= 0 else 'W'}",
-                "-overwrite_original",
-                filepath
-            ]
-            et.execute(*[cmd.encode("utf-8") for cmd in cmds])
+        # Поиск exiftool.exe
+        exiftool_path = find_exiftool()
+        if not exiftool_path:
+            logger.error("ExifTool не найден")
+            return False
+
+        # Используем subprocess напрямую
+        cmd = [
+            exiftool_path,
+            f"-GPSLatitude={abs(lat)}",
+            f"-GPSLatitudeRef={'N' if lat >= 0 else 'S'}",
+            f"-GPSLongitude={abs(lon)}",
+            f"-GPSLongitudeRef={'E' if lon >= 0 else 'W'}",
+            "-overwrite_original",
+            filepath
+        ]
+
+        process = subprocess.run(
+            cmd, capture_output=True, text=True, creationflags=subprocess.CREATE_NO_WINDOW)
+
+        if process.returncode != 0:
+            logger.error(f"Ошибка exiftool: {process.stderr}")
+            return False
+
         return True
     except Exception as e:
         logger.error(f"Ошибка при записи GPS в ARW {filepath}: {e}")
@@ -249,11 +272,90 @@ def has_gps_in_exif(filepath: str) -> bool:
             return False
     elif ext == ".arw":
         try:
-            with exiftool.ExifTool(executable="exiftool.exe") as et:
-                metadata = et.get_tags(
-                    ["GPSLatitude", "GPSLongitude"], filepath)
-                return "EXIF:GPSLatitude" in metadata or "EXIF:GPSLongitude" in metadata
+            exiftool_path = find_exiftool()
+            if not exiftool_path:
+                logger.error("ExifTool не найден")
+                return False
+
+            cmd = [
+                exiftool_path,
+                "-s",
+                "-GPSLatitude",
+                "-GPSLongitude",
+                filepath
+            ]
+
+            process = subprocess.run(
+                cmd, capture_output=True, text=True, creationflags=subprocess.CREATE_NO_WINDOW)
+
+            if process.returncode != 0:
+                logger.error(f"Ошибка exiftool: {process.stderr}")
+                return False
+
+            # Если в выводе есть GPS координаты
+            return "GPSLatitude" in process.stdout or "GPSLongitude" in process.stdout
         except Exception as e:
             logger.error(f"Ошибка при проверке GPS в ARW {filepath}: {e}")
             return False
     return False
+
+
+def find_exiftool():
+    """Находит путь к exiftool.exe"""
+    # Пути для поиска exiftool
+    possible_paths = [
+        # Текущая директория
+        os.path.join(os.getcwd(), "exiftool.exe"),
+        # Директория проекта
+        os.path.join(os.path.dirname(os.path.dirname(
+            os.path.abspath(__file__))), "exiftool.exe"),
+        # Директория скрипта
+        os.path.dirname(os.path.abspath(sys.argv[0])),
+        # Просто exiftool в PATH
+        "exiftool"
+    ]
+
+    # Добавляем путь к exiftool.exe в текущей директории
+    script_dir = os.path.dirname(os.path.abspath(sys.argv[0]))
+    exiftool_in_script_dir = os.path.join(script_dir, "exiftool.exe")
+    if exiftool_in_script_dir not in possible_paths:
+        possible_paths.append(exiftool_in_script_dir)
+
+    for path in possible_paths:
+        try:
+            if path == "exiftool":
+                # Проверяем, доступен ли exiftool в PATH
+                subprocess.run(["exiftool", "-ver"],
+                               capture_output=True, text=True, check=True,
+                               creationflags=subprocess.CREATE_NO_WINDOW)
+                return "exiftool"
+            elif os.path.exists(path):
+                # Проверяем, работает ли exiftool по указанному пути
+                subprocess.run([path, "-ver"],
+                               capture_output=True, text=True, check=True,
+                               creationflags=subprocess.CREATE_NO_WINDOW)
+                return path
+        except Exception:
+            continue
+
+    # Если exiftool не найден, пробуем найти его в директории проекта
+    try:
+        # Получаем абсолютный путь к директории проекта
+        project_dir = os.path.dirname(
+            os.path.dirname(os.path.abspath(__file__)))
+
+        # Ищем exiftool.exe в директории проекта
+        for root, dirs, files in os.walk(project_dir):
+            if "exiftool.exe" in files:
+                exiftool_path = os.path.join(root, "exiftool.exe")
+                try:
+                    subprocess.run([exiftool_path, "-ver"],
+                                   capture_output=True, text=True, check=True,
+                                   creationflags=subprocess.CREATE_NO_WINDOW)
+                    return exiftool_path
+                except Exception:
+                    continue
+    except Exception:
+        pass
+
+    return None

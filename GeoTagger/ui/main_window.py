@@ -15,10 +15,11 @@ from PySide6.QtGui import (QBrush, QColor, QConicalGradient, QCursor,
                            QFont, QFontDatabase, QGradient, QIcon,
                            QImage, QKeySequence, QLinearGradient, QPainter,
                            QPalette, QPixmap, QRadialGradient, QTransform)
-from PySide6.QtWidgets import (QApplication, QFrame, QHBoxLayout, QHeaderView,
-                               QLabel, QLineEdit, QMainWindow, QPushButton,
-                               QSizePolicy, QSpacerItem, QTabWidget, QTableWidget,
-                               QTableWidgetItem, QTextEdit, QVBoxLayout, QWidget)
+from PySide6.QtWidgets import (QApplication, QFormLayout, QFrame, QGroupBox,
+                               QHBoxLayout, QHeaderView, QLabel, QLineEdit,
+                               QMainWindow, QProgressBar, QPushButton, QSizePolicy,
+                               QSpacerItem, QTabWidget, QTableWidget, QTableWidgetItem,
+                               QTextEdit, QVBoxLayout, QWidget)
 import ui.resources_rc
 
 
@@ -80,26 +81,62 @@ class Ui_MainWindow(object):
 
         self.horizontalLayoutTopInfo.addItem(self.horizontalSpacer)
 
+        self.statusLabel = QLabel(self.topPanel)
+        self.statusLabel.setObjectName(u"statusLabel")
+
+        self.horizontalLayoutTopInfo.addWidget(self.statusLabel)
+
+        self.progressBar = QProgressBar(self.topPanel)
+        self.progressBar.setObjectName(u"progressBar")
+        self.progressBar.setMaximumSize(QSize(150, 16777215))
+        self.progressBar.setValue(0)
+        self.progressBar.setTextVisible(False)
+
+        self.horizontalLayoutTopInfo.addWidget(self.progressBar)
+
         self.verticalLayout.addWidget(self.topPanel)
 
-        self.infoLayout = QHBoxLayout()
-        self.infoLayout.setObjectName(u"infoLayout")
-        self.lblStartUTC = QLabel(self.centralwidget)
+        self.trackInfoGroup = QGroupBox(self.centralwidget)
+        self.trackInfoGroup.setObjectName(u"trackInfoGroup")
+        self.formLayout = QFormLayout(self.trackInfoGroup)
+        self.formLayout.setObjectName(u"formLayout")
+        self.formLayout.setHorizontalSpacing(10)
+        self.formLayout.setVerticalSpacing(2)
+        self.formLayout.setContentsMargins(10, 5, 10, 5)
+        self.lblStartUTCLabel = QLabel(self.trackInfoGroup)
+        self.lblStartUTCLabel.setObjectName(u"lblStartUTCLabel")
+
+        self.formLayout.setWidget(
+            0, QFormLayout.LabelRole, self.lblStartUTCLabel)
+
+        self.lblStartUTC = QLabel(self.trackInfoGroup)
         self.lblStartUTC.setObjectName(u"lblStartUTC")
 
-        self.infoLayout.addWidget(self.lblStartUTC)
+        self.formLayout.setWidget(0, QFormLayout.FieldRole, self.lblStartUTC)
 
-        self.lblEndUTC = QLabel(self.centralwidget)
+        self.lblEndUTCLabel = QLabel(self.trackInfoGroup)
+        self.lblEndUTCLabel.setObjectName(u"lblEndUTCLabel")
+
+        self.formLayout.setWidget(
+            1, QFormLayout.LabelRole, self.lblEndUTCLabel)
+
+        self.lblEndUTC = QLabel(self.trackInfoGroup)
         self.lblEndUTC.setObjectName(u"lblEndUTC")
 
-        self.infoLayout.addWidget(self.lblEndUTC)
+        self.formLayout.setWidget(1, QFormLayout.FieldRole, self.lblEndUTC)
 
-        self.lblStartLocal = QLabel(self.centralwidget)
+        self.lblStartLocalLabel = QLabel(self.trackInfoGroup)
+        self.lblStartLocalLabel.setObjectName(u"lblStartLocalLabel")
+
+        self.formLayout.setWidget(
+            2, QFormLayout.LabelRole, self.lblStartLocalLabel)
+
+        self.lblStartLocal = QLabel(self.trackInfoGroup)
         self.lblStartLocal.setObjectName(u"lblStartLocal")
 
-        self.infoLayout.addWidget(self.lblStartLocal)
+        self.formLayout.setWidget(2, QFormLayout.FieldRole, self.lblStartLocal)
 
-        self.verticalLayout.addLayout(self.infoLayout)
+        self.verticalLayout.addWidget(self.trackInfoGroup)
 
         self.tabWidgetMain = QTabWidget(self.centralwidget)
         self.tabWidgetMain.setObjectName(u"tabWidgetMain")
@@ -188,12 +225,21 @@ class Ui_MainWindow(object):
             "MainWindow", u"\u041f\u043e\u043f\u0440\u0430\u0432\u043a\u0430 \u0432\u0440\u0435\u043c\u0435\u043d\u0438 (\u0447:\u043c\u043c)", None))
         self.btnStart.setText(QCoreApplication.translate(
             "MainWindow", u"\u0417\u0430\u043f\u0443\u0441\u043a", None))
-        self.lblStartUTC.setText(QCoreApplication.translate(
-            "MainWindow", u"\u041d\u0430\u0447\u0430\u043b\u043e \u0442\u0440\u0435\u043a\u0430 (UTC): -", None))
-        self.lblEndUTC.setText(QCoreApplication.translate(
-            "MainWindow", u"\u041a\u043e\u043d\u0435\u0446 \u0442\u0440\u0435\u043a\u0430 (UTC): -", None))
-        self.lblStartLocal.setText(QCoreApplication.translate(
-            "MainWindow", u"\u041c\u0435\u0441\u0442\u043d\u043e\u0435 \u0432\u0440\u0435\u043c\u044f \u0441\u0442\u0430\u0440\u0442\u0430: -", None))
+        self.statusLabel.setText("")
+        self.trackInfoGroup.setTitle(QCoreApplication.translate(
+            "MainWindow", u"\u0418\u043d\u0444\u043e\u0440\u043c\u0430\u0446\u0438\u044f \u043e \u0442\u0440\u0435\u043a\u0435", None))
+        self.lblStartUTCLabel.setText(QCoreApplication.translate(
+            "MainWindow", u"\u041d\u0430\u0447\u0430\u043b\u043e \u0442\u0440\u0435\u043a\u0430 (UTC):", None))
+        self.lblStartUTC.setText(
+            QCoreApplication.translate("MainWindow", u"-", None))
+        self.lblEndUTCLabel.setText(QCoreApplication.translate(
+            "MainWindow", u"\u041a\u043e\u043d\u0435\u0446 \u0442\u0440\u0435\u043a\u0430 (UTC):", None))
+        self.lblEndUTC.setText(
+            QCoreApplication.translate("MainWindow", u"-", None))
+        self.lblStartLocalLabel.setText(QCoreApplication.translate(
+            "MainWindow", u"\u041c\u0435\u0441\u0442\u043d\u043e\u0435 \u0432\u0440\u0435\u043c\u044f \u0441\u0442\u0430\u0440\u0442\u0430:", None))
+        self.lblStartLocal.setText(
+            QCoreApplication.translate("MainWindow", u"-", None))
         ___qtablewidgetitem = self.tableFiles.horizontalHeaderItem(0)
         ___qtablewidgetitem.setText(QCoreApplication.translate(
             "MainWindow", u"\u0424\u0430\u0439\u043b", None))

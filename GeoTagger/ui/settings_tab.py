@@ -4,12 +4,15 @@ from PySide6.QtWidgets import (
 )
 from PySide6.QtCore import Qt, Signal, QFile, QTextStream
 from PySide6.QtGui import QIcon
+import os
+import subprocess
 
 
 class SettingsTab(QWidget):
     """Вкладка настроек приложения"""
 
     theme_changed = Signal(str)  # Сигнал для изменения темы
+    test_data_requested = Signal()  # Сигнал для создания тестовых данных
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -51,6 +54,14 @@ class SettingsTab(QWidget):
 
         app_layout.addLayout(info_layout)
 
+        # Кнопка создания тестовых данных
+        test_layout = QHBoxLayout()
+        self.create_test_data_button = QPushButton("Создать тестовые данные")
+        self.create_test_data_button.setIcon(QIcon(":/icons/folder.png"))
+        test_layout.addWidget(self.create_test_data_button)
+        test_layout.addStretch()
+        app_layout.addLayout(test_layout)
+
         layout.addWidget(self.app_group)
 
         # Растягиваем пространство
@@ -59,6 +70,9 @@ class SettingsTab(QWidget):
     def _connect_signals(self):
         # Тема меняется сразу при выборе
         self.theme_combo.currentTextChanged.connect(self._change_theme)
+
+        # Кнопка создания тестовых данных
+        self.create_test_data_button.clicked.connect(self._create_test_data)
 
     def _change_theme(self, theme_name):
         """Обрабатывает изменение темы"""
@@ -76,47 +90,25 @@ class SettingsTab(QWidget):
         # Отправляем сигнал об изменении темы
         self.theme_changed.emit(theme)
 
-    def check_exiftool(self, exiftool_path=None):
-        """Проверяет наличие ExifTool и обновляет статус"""
-        import os
-        import subprocess
+    def _create_test_data(self):
+        """Создает тестовые данные"""
+        # Отправляем сигнал для создания тестовых данных
+        self.test_data_requested.emit()
 
-        if exiftool_path and os.path.exists(exiftool_path):
-            try:
-                result = subprocess.run([exiftool_path, "-ver"],
-                                        capture_output=True, text=True, check=True)
-                version = result.stdout.strip()
-                self.exiftool_label.setText(f"Найден (v{version})")
-                self.exiftool_label.setStyleSheet("color: green;")
-                return True
-            except Exception:
-                pass
-
-        # Проверяем в текущей директории
-        current_dir = os.path.dirname(
-            os.path.dirname(os.path.abspath(__file__)))
-        exiftool_path = os.path.join(current_dir, "exiftool.exe")
-
-        if os.path.exists(exiftool_path):
-            try:
-                result = subprocess.run([exiftool_path, "-ver"],
-                                        capture_output=True, text=True, check=True)
-                version = result.stdout.strip()
-                self.exiftool_label.setText(f"Найден (v{version})")
-                self.exiftool_label.setStyleSheet("color: green;")
-                return True
-            except Exception:
-                pass
-
-        # Проверяем в PATH
+    def update_exiftool_status(self, exiftool_path):
+        """Обновляет статус ExifTool"""
         try:
-            result = subprocess.run(["exiftool", "-ver"],
-                                    capture_output=True, text=True, check=True)
-            version = result.stdout.strip()
-            self.exiftool_label.setText(f"Найден в PATH (v{version})")
-            self.exiftool_label.setStyleSheet("color: green;")
-            return True
+            if exiftool_path:
+                result = subprocess.run([exiftool_path, "-ver"],
+                                        capture_output=True, text=True, check=True,
+                                        creationflags=subprocess.CREATE_NO_WINDOW)
+                version = result.stdout.strip()
+                self.exiftool_label.setText(f"Найден (v{version})")
+                self.exiftool_label.setStyleSheet("color: green;")
+                return exiftool_path
         except Exception:
-            self.exiftool_label.setText("Не найден")
-            self.exiftool_label.setStyleSheet("color: red;")
-            return False
+            pass
+
+        self.exiftool_label.setText("Не найден")
+        self.exiftool_label.setStyleSheet("color: red;")
+        return None
