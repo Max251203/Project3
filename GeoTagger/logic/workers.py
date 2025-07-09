@@ -1,4 +1,4 @@
-from PySide6.QtCore import QObject, Signal, QRunnable, QThreadPool, Slot
+from PySide6.QtCore import QObject, Signal, QRunnable, QThreadPool, Slot, QThread
 import traceback
 import sys
 
@@ -14,7 +14,7 @@ class WorkerSignals(QObject):
     progress = Signal(int)
 
 
-class Worker(QRunnable):
+class Worker(QThread):
     """
     Рабочий поток для выполнения задач в фоне
     """
@@ -31,7 +31,6 @@ class Worker(QRunnable):
         if 'progress_callback' in kwargs:
             self.kwargs['progress_callback'] = self.signals.progress
 
-    @Slot()
     def run(self):
         """
         Запускает рабочий поток
@@ -55,7 +54,7 @@ class Worker(QRunnable):
             self.signals.finished.emit()
 
 
-class GeoTagWorker(QRunnable):
+class GeoTagWorker(QThread):
     """
     Специализированный рабочий поток для геотеггинга
     """
@@ -68,7 +67,6 @@ class GeoTagWorker(QRunnable):
         self.time_correction = time_correction
         self.signals = WorkerSignals()
 
-    @Slot()
     def run(self):
         """
         Запускает обработку геотегов

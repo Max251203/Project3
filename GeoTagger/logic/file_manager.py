@@ -116,10 +116,24 @@ def _convert_to_decimal(coord, ref) -> Optional[float]:
     if not coord or not ref:
         return None
     try:
-        d = coord[0][0] / coord[0][1]
-        m = coord[1][0] / coord[1][1]
-        s = coord[2][0] / coord[2][1]
-        decimal = d + (m / 60.0) + (s / 3600.0)
+        # Проверяем тип координат
+        if isinstance(coord, tuple) and len(coord) == 3:
+            # Формат: ((deg, 1), (min, 1), (sec, 100))
+            d = coord[0][0] / \
+                coord[0][1] if isinstance(coord[0], tuple) else coord[0]
+            m = coord[1][0] / \
+                coord[1][1] if isinstance(coord[1], tuple) else coord[1]
+            s = coord[2][0] / \
+                coord[2][1] if isinstance(coord[2], tuple) else coord[2]
+        elif isinstance(coord, list) and len(coord) == 3:
+            # Формат: [deg, min, sec]
+            d, m, s = coord
+        else:
+            # Неизвестный формат
+            logger.warning(f"Неизвестный формат координат: {coord}")
+            return None
+
+        decimal = float(d) + (float(m) / 60.0) + (float(s) / 3600.0)
         if ref in ['S', 'W']:
             decimal *= -1
         return decimal

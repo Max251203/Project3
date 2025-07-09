@@ -81,10 +81,13 @@ class Ui_MainWindow(object):
 
         self.horizontalLayoutTopInfo.addItem(self.horizontalSpacer)
 
+        self.statusLayout = QHBoxLayout()
+        self.statusLayout.setObjectName(u"statusLayout")
         self.statusLabel = QLabel(self.topPanel)
         self.statusLabel.setObjectName(u"statusLabel")
+        self.statusLabel.setMinimumWidth(100)
 
-        self.horizontalLayoutTopInfo.addWidget(self.statusLabel)
+        self.statusLayout.addWidget(self.statusLabel)
 
         self.progressBar = QProgressBar(self.topPanel)
         self.progressBar.setObjectName(u"progressBar")
@@ -92,7 +95,9 @@ class Ui_MainWindow(object):
         self.progressBar.setValue(0)
         self.progressBar.setTextVisible(False)
 
-        self.horizontalLayoutTopInfo.addWidget(self.progressBar)
+        self.statusLayout.addWidget(self.progressBar)
+
+        self.horizontalLayoutTopInfo.addLayout(self.statusLayout)
 
         self.verticalLayout.addWidget(self.topPanel)
 

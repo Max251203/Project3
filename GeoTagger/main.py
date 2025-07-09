@@ -5,7 +5,7 @@ from PySide6.QtWidgets import (
     QLabel
 )
 from PySide6.QtGui import QIcon
-from PySide6.QtCore import QFile, QTextStream, QThreadPool
+from PySide6.QtCore import QFile, QTextStream
 
 # UI
 from ui.main_window import Ui_MainWindow
@@ -18,8 +18,7 @@ from logic.gpx_parser import parse_gpx_metadata, analyze_gpx_file
 from logic.exif_handler import process_images, find_exiftool
 from logic.dialog_utils import show_warning, show_info, show_error
 from logic.logger import get_logger
-from logic.workers import GeoTagWorker
-from logic.test_utils import create_test_dataset
+from logic.workers import Worker
 
 
 class MainWindow(QMainWindow):
@@ -35,7 +34,6 @@ class MainWindow(QMainWindow):
         self.gpx_file_path = None
         self.current_theme = "dark"  # Тема по умолчанию
         self.logger = get_logger()
-        self.thread_pool = QThreadPool()
 
         # Настройка UI
         self.setup_ui()
@@ -70,11 +68,6 @@ class MainWindow(QMainWindow):
         # Настройка прогресс-бара и статуса
         self.ui.progressBar.setVisible(False)
         self.ui.statusLabel.setText("")
-
-        # Стилизация меток информации о треке
-        self.ui.lblStartUTCLabel.setProperty("labelType", "title")
-        self.ui.lblEndUTCLabel.setProperty("labelType", "title")
-        self.ui.lblStartLocalLabel.setProperty("labelType", "title")
 
     def connect_signals(self):
         """Подключение сигналов"""
@@ -139,22 +132,27 @@ class MainWindow(QMainWindow):
             # Блокируем кнопки
             self.set_buttons_enabled(False)
 
-            # Создаем рабочий поток
-            worker = GeoTagWorker(
-                lambda folder_path, **kwargs: file_manager.get_image_files(
-                    folder_path),
-                folder, None, None
-            )
+            # Загружаем изображения напрямую
+            images = file_manager.get_image_files(folder)
 
-            # Подключаем сигналы
-            worker.signals.finished.connect(
-                lambda: self.on_worker_finished("Загрузка завершена"))
-            worker.signals.result.connect(self.on_images_loaded)
-            worker.signals.error.connect(self.on_worker_error)
-            worker.signals.progress.connect(self.on_progress_update)
+            for row, image_info in enumerate(images):
+                self.ui.tableFiles.insertRow(row)
+                self.ui.tableFiles.setItem(
+                    row, 0, file_manager.make_table_item(image_info.filename))
+                self.ui.tableFiles.setItem(
+                    row, 1, file_manager.make_table_item(image_info.datetime_original))
+                self.ui.tableFiles.setItem(
+                    row, 2, file_manager.make_table_item(image_info.gps_string or "-"))
 
-            # Запускаем поток
-            self.thread_pool.start(worker)
+            self.logger.success(f"Загружено {len(images)} изображений")
+
+            # Разблокируем кнопки и скрываем прогресс
+            self.set_buttons_enabled(True)
+            self.ui.progressBar.setVisible(False)
+            self.ui.statusLabel.setText("Изображения загружены")
+
+            # Обновляем логи
+            self.refresh_logs()
 
         except Exception as e:
             self.ui.progressBar.setVisible(False)
@@ -163,20 +161,6 @@ class MainWindow(QMainWindow):
             self.refresh_logs()
             show_error(self, "Ошибка",
                        f"Не удалось загрузить изображения: {e}")
-
-    def on_images_loaded(self, images):
-        """Обработка загруженных изображений"""
-        for row, image_info in enumerate(images):
-            self.ui.tableFiles.insertRow(row)
-            self.ui.tableFiles.setItem(
-                row, 0, file_manager.make_table_item(image_info.filename))
-            self.ui.tableFiles.setItem(
-                row, 1, file_manager.make_table_item(image_info.datetime_original))
-            self.ui.tableFiles.setItem(
-                row, 2, file_manager.make_table_item(image_info.gps_string or "-"))
-
-        self.logger.success(f"Загружено {len(images)} изображений")
-        self.refresh_logs()
 
     def load_gpx(self):
         """Загрузка GPX-файла"""
@@ -187,14 +171,13 @@ class MainWindow(QMainWindow):
             try:
                 # Показываем прогресс
                 self.ui.progressBar.setVisible(True)
-                self.ui.progressBar.setValue(
-                    50)  # Устанавливаем прогресс на 50%
+                self.ui.progressBar.setValue(0)
                 self.ui.statusLabel.setText("Загрузка GPX...")
 
                 # Блокируем кнопки
                 self.set_buttons_enabled(False)
 
-                # Загружаем GPX напрямую (без потока)
+                # Загружаем GPX напрямую
                 metadata = parse_gpx_metadata(path)
 
                 self.ui.lblStartUTC.setText(metadata['start'])
@@ -204,15 +187,19 @@ class MainWindow(QMainWindow):
                 self.logger.success(f"Загружен GPX: {os.path.basename(path)}")
 
                 # Анализируем GPX-файл для логов
-                self.analyze_gpx(path)
-
-                # Обновляем логи
-                self.refresh_logs()
+                try:
+                    analyze_gpx_file(path)
+                except Exception as e:
+                    self.logger.warning(
+                        f"Не удалось проанализировать GPX: {e}")
 
                 # Разблокируем кнопки и скрываем прогресс
                 self.set_buttons_enabled(True)
                 self.ui.progressBar.setVisible(False)
                 self.ui.statusLabel.setText("GPX загружен")
+
+                # Обновляем логи
+                self.refresh_logs()
 
             except Exception as e:
                 self.ui.progressBar.setVisible(False)
@@ -225,39 +212,9 @@ class MainWindow(QMainWindow):
     def analyze_gpx(self, path):
         """Анализирует GPX-файл и выводит информацию в логи"""
         try:
-            worker = GeoTagWorker(
-                lambda gpx_path, **kwargs: analyze_gpx_file(gpx_path),
-                None, path, None
-            )
-
-            worker.signals.result.connect(self.on_gpx_analyzed)
-            worker.signals.error.connect(lambda error: self.logger.warning(
-                f"Не удалось проанализировать GPX: {error[1]}"))
-
-            self.thread_pool.start(worker)
+            analyze_gpx_file(path)
         except Exception as e:
             self.logger.warning(f"Не удалось проанализировать GPX: {e}")
-
-    def on_gpx_analyzed(self, info):
-        """Обработка результатов анализа GPX"""
-        if info:
-            self.logger.info(
-                f"Анализ GPX: {info.get('point_count', 0)} точек, {info.get('points_with_time', 0)} с временем")
-            if 'time_range' in info:
-                self.logger.info(
-                    f"Продолжительность трека: {info['time_range']}")
-            if 'geo_range' in info:
-                self.logger.info(f"Географический охват: {info['geo_range']}")
-
-    def on_gpx_loaded(self, metadata):
-        """Обработка загруженного GPX"""
-        self.ui.lblStartUTC.setText(metadata['start'])
-        self.ui.lblEndUTC.setText(metadata['end'])
-        self.ui.lblStartLocal.setText(metadata['start_local'])
-
-        self.logger.success(
-            f"Загружен GPX: {os.path.basename(self.gpx_file_path)}")
-        self.refresh_logs()
 
     def run_geotagging(self):
         """Запуск обработки геометок"""
@@ -283,7 +240,7 @@ class MainWindow(QMainWindow):
             self.set_buttons_enabled(False)
 
             # Создаем рабочий поток
-            worker = GeoTagWorker(
+            self.geotag_worker = Worker(
                 process_images,
                 self.image_folder,
                 self.gpx_file_path,
@@ -291,14 +248,16 @@ class MainWindow(QMainWindow):
             )
 
             # Подключаем сигналы
-            worker.signals.finished.connect(
+            self.geotag_worker.signals.finished.connect(
                 lambda: self.on_worker_finished("Обработка завершена"))
-            worker.signals.result.connect(self.on_geotagging_completed)
-            worker.signals.error.connect(self.on_worker_error)
-            worker.signals.progress.connect(self.on_progress_update)
+            self.geotag_worker.signals.result.connect(
+                self.on_geotagging_completed)
+            self.geotag_worker.signals.error.connect(self.on_worker_error)
+            self.geotag_worker.signals.progress.connect(
+                self.on_progress_update)
 
             # Запускаем поток
-            self.thread_pool.start(worker)
+            self.geotag_worker.start()
 
         except Exception as e:
             self.ui.progressBar.setVisible(False)
@@ -334,6 +293,9 @@ class MainWindow(QMainWindow):
         self.ui.progressBar.setVisible(False)
         self.ui.statusLabel.setText(message)
 
+        # Обновляем логи
+        self.refresh_logs()
+
     def on_worker_error(self, error_info):
         """Обработка ошибки в потоке"""
         exctype, value, traceback = error_info
@@ -364,7 +326,7 @@ class MainWindow(QMainWindow):
 
             # Показываем прогресс
             self.ui.progressBar.setVisible(True)
-            self.ui.progressBar.setValue(10)
+            self.ui.progressBar.setValue(0)
             self.ui.statusLabel.setText("Создание тестовых данных...")
 
             # Блокируем кнопки
@@ -373,10 +335,8 @@ class MainWindow(QMainWindow):
             # Импортируем функцию создания тестовых данных
             from logic.test_utils import create_test_dataset
 
-            # Создаем тестовые данные напрямую (без потока)
-            self.ui.progressBar.setValue(30)
+            # Создаем тестовые данные напрямую
             result = create_test_dataset(folder)
-            self.ui.progressBar.setValue(80)
 
             if result:
                 self.logger.success(
@@ -420,34 +380,9 @@ class MainWindow(QMainWindow):
             show_error(self, "Ошибка",
                        f"Не удалось создать тестовые данные:\n{e}")
 
-    def on_test_data_created(self, result):
-        """Обработка результатов создания тестовых данных"""
-        if result:
-            self.logger.success(
-                f"Создано {len(result['gpx_paths'])} GPX-файлов")
-            self.logger.success(
-                f"Создано {len(result['image_paths'])} тестовых изображений")
-
-            # Автоматически загружаем тестовые данные
-            self.gpx_file_path = result['main_gpx_path']
-            self.image_folder = os.path.dirname(result['main_gpx_path'])
-
-            # Загружаем GPX
-            self.load_gpx()
-
-            # Загружаем изображения
-            self.load_image_data(self.image_folder)
-
-            show_info(self, "Готово", "Тестовые данные созданы и загружены")
-        else:
-            self.logger.error("Не удалось создать тестовые данные")
-            show_error(self, "Ошибка", "Не удалось создать тестовые данные")
-
 
 if __name__ == "__main__":
     app = QApplication(sys.argv)
-
     window = MainWindow()
     window.show()
-
     sys.exit(app.exec())

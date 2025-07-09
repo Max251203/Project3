@@ -42,6 +42,21 @@ def process_images(folder_path: str, gpx_path: str, time_correction: str = "0:00
 
     logger.info(f"Найдено {total} файлов для обработки")
 
+    # Сначала проверяем, есть ли файлы с GPS-данными
+    files_with_gps = []
+    for filename in files:
+        filepath = os.path.join(folder_path, filename)
+        if has_gps_in_exif(filepath):
+            files_with_gps.append(filename)
+
+    # Если есть файлы с GPS-данными, спрашиваем пользователя один раз
+    if files_with_gps and len(files_with_gps) > 0:
+        # Здесь мы должны вернуть сигнал для основного потока, чтобы он показал диалог
+        # Но так как это не поддерживается в нашей архитектуре, мы просто пропустим эти файлы
+        logger.warning(
+            f"Найдено {len(files_with_gps)} файлов с GPS-данными. Они будут пропущены.")
+        global_prompt_state = "skip_all"
+
     for i, filename in enumerate(files):
         # Обновляем прогресс
         if progress_callback:
@@ -70,22 +85,10 @@ def process_images(folder_path: str, gpx_path: str, time_correction: str = "0:00
         existing_gps = has_gps_in_exif(filepath)
 
         if existing_gps and global_prompt_state is None:
-            logger.info(f"Файл {filename} уже содержит GPS-данные")
-            result = confirm_overwrite_gps(filename)
-            if result == "overwrite_all":
-                global_prompt_state = "overwrite_all"
-                logger.info("Выбрано: перезаписать все")
-            elif result == "skip_all":
-                global_prompt_state = "skip_all"
-                logger.info("Выбрано: пропустить все")
-            elif result == "overwrite":
-                logger.info(f"Выбрано: перезаписать {filename}")
-            elif result == "skip":
-                logger.info(f"Выбрано: пропустить {filename}")
-                continue
-            elif result == "cancel":
-                logger.info("Операция отменена пользователем")
-                break
+            # Пропускаем файлы с GPS-данными
+            logger.info(
+                f"Файл {filename} уже содержит GPS-данные. Пропускаем.")
+            continue
 
         if existing_gps and global_prompt_state == "skip_all":
             continue

@@ -282,7 +282,7 @@ def create_test_images(output_folder: str, count: int = 5, base_time: datetime =
                   fill=(0, 0, 0), font=font)
 
         # Создаем EXIF-данные
-        exif_dict = {"0th": {}, "Exif": {}, "GPS": {}}
+        exif_dict = {"0th": {}, "Exif": {}}
         exif_dict["Exif"][piexif.ExifIFD.DateTimeOriginal] = image_time_str
 
         # Добавляем GPS-координаты, если нужно
@@ -295,6 +295,7 @@ def create_test_images(output_folder: str, count: int = 5, base_time: datetime =
             lat_ref = "N" if lat >= 0 else "S"
             lon_ref = "E" if lon >= 0 else "W"
 
+            # Преобразуем координаты в градусы, минуты, секунды
             lat_deg = int(abs(lat))
             lat_min = int((abs(lat) - lat_deg) * 60)
             lat_sec = int(((abs(lat) - lat_deg) * 60 - lat_min) * 60 * 100)
@@ -303,12 +304,16 @@ def create_test_images(output_folder: str, count: int = 5, base_time: datetime =
             lon_min = int((abs(lon) - lon_deg) * 60)
             lon_sec = int(((abs(lon) - lon_deg) * 60 - lon_min) * 60 * 100)
 
-            exif_dict["GPS"][piexif.GPSIFD.GPSLatitudeRef] = lat_ref
-            exif_dict["GPS"][piexif.GPSIFD.GPSLatitude] = (
-                (lat_deg, 1), (lat_min, 1), (lat_sec, 100))
-            exif_dict["GPS"][piexif.GPSIFD.GPSLongitudeRef] = lon_ref
-            exif_dict["GPS"][piexif.GPSIFD.GPSLongitude] = (
-                (lon_deg, 1), (lon_min, 1), (lon_sec, 100))
+            # Создаем GPS-данные в формате EXIF
+            gps_ifd = {
+                piexif.GPSIFD.GPSLatitudeRef: lat_ref,
+                piexif.GPSIFD.GPSLatitude: ((lat_deg, 1), (lat_min, 1), (lat_sec, 100)),
+                piexif.GPSIFD.GPSLongitudeRef: lon_ref,
+                piexif.GPSIFD.GPSLongitude: (
+                    (lon_deg, 1), (lon_min, 1), (lon_sec, 100))
+            }
+
+            exif_dict["GPS"] = gps_ifd
 
         # Сохраняем изображение
         filename = f"test_image_{i+1}.jpg"
