@@ -2,7 +2,7 @@ import sys
 import os
 
 from PySide6.QtWidgets import (
-    QApplication, QMainWindow, QFileDialog, QHeaderView, QTableWidgetItem, QMessageBox
+    QApplication, QMainWindow, QFileDialog, QHeaderView, QTableWidgetItem, QMessageBox, QTableWidget
 )
 from PySide6.QtCore import QFile, QTextStream
 from PySide6.QtGui import QIcon
@@ -48,7 +48,15 @@ class MainWindow(QMainWindow):
         self.setWindowTitle("GeoTagger")
         self.setMinimumSize(900, 600)
 
+        # Настройка таблицы
         self.ui.tableFiles.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
+        self.ui.tableFiles.setEditTriggers(
+            QTableWidget.NoEditTriggers)  # Запрет редактирования
+        self.ui.tableFiles.setSelectionBehavior(
+            QTableWidget.SelectRows)  # Выбор строк целиком
+        self.ui.tableFiles.setSelectionMode(
+            QTableWidget.SingleSelection)  # Одиночный выбор
+
         self.ui.statusLabel.setText("")
 
         self.settings_tab = SettingsTab(self)
@@ -297,6 +305,56 @@ class MainWindow(QMainWindow):
         except Exception as e:
             self.on_worker_error((type(e), str(e), ""))
         self.set_buttons_enabled(True)
+
+    def test_arw_write(self):
+        """Тестирует запись GPS в ARW файл"""
+        from logic.config import get_exiftool_path
+        from logic.exif_handler import write_gps_to_exif
+
+        exiftool = get_exiftool_path()
+        if not exiftool or not os.path.exists(exiftool):
+            show_error(self, "Ошибка", "ExifTool не настроен")
+            return
+
+        # Выбираем ARW файл
+        filepath, _ = QFileDialog.getOpenFileName(
+            self, "Выберите ARW файл для теста", filter="Sony ARW (*.arw)"
+        )
+
+        if not filepath:
+            return
+
+        # Устанавливаем тестовые координаты
+        lat, lon = 55.7558, 37.6173
+
+        # Пробуем записать
+        self.logger.info(f"Тест записи GPS в ARW: {filepath}")
+        if write_gps_to_exif(filepath, lat, lon):
+            self.logger.success(
+                f"Тест успешен: координаты записаны в {os.path.basename(filepath)}")
+            show_info(self, "Успех",
+                      f"Координаты {lat:.6f}, {lon:.6f} записаны в ARW файл")
+        else:
+            self.logger.error(
+                f"Тест не удался: не удалось записать координаты в {os.path.basename(filepath)}")
+            show_error(self, "Ошибка",
+                       "Не удалось записать координаты в ARW файл")
+
+    def on_geotagging_done(self, result):
+        updated, total = result
+        msg = f"Геометки добавлены в {updated} из {total} файлов"
+        self.logger.success(msg)
+        self.update_status("Обработка завершена")
+
+        # Проверяем, были ли изменены координаты
+        if updated > 0:
+            show_info(self, "Готово",
+                      f"{msg}\n\nПроверьте лог для деталей изменений.")
+        else:
+            show_info(self, "Готово", msg)
+
+        self.refresh_logs()
+        self.load_images(self.image_folder)
 
 
 if __name__ == "__main__":

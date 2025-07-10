@@ -54,11 +54,20 @@ def create_test_dataset(output_folder: str) -> dict:
             output_folder, f"no_gps_{i+1}.jpg", dt, gps=False)
         image_paths.append(img_path)
 
+    # # 3. Изображения с GPS (5 шт.) также в пределах трека
+    # for i in range(5):
+    #     dt = start_time + timedelta(minutes=i * 2 + 10)
+    #     lat = base_lat + i * 0.001
+    #     lon = base_lon + i * 0.001
+    #     img_path = create_image(
+    #         output_folder, f"with_gps_{i+1}.jpg", dt, gps=True, lat=lat, lon=lon)
+    #     image_paths.append(img_path)
     # 3. Изображения с GPS (5 шт.) также в пределах трека
     for i in range(5):
         dt = start_time + timedelta(minutes=i * 2 + 10)
-        lat = base_lat + i * 0.001
-        lon = base_lon + i * 0.001
+        # Разные координаты для каждого изображения
+        lat = base_lat + i * 0.002  # Увеличиваем шаг для наглядности
+        lon = base_lon + i * 0.002
         img_path = create_image(
             output_folder, f"with_gps_{i+1}.jpg", dt, gps=True, lat=lat, lon=lon)
         image_paths.append(img_path)

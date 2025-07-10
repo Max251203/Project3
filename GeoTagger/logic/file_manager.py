@@ -1,4 +1,5 @@
 import os
+import subprocess
 from typing import List, Optional
 from dataclasses import dataclass
 from PySide6.QtWidgets import QTableWidgetItem
@@ -9,6 +10,7 @@ from logic.time_sync import get_datetime_from_image
 
 logger = get_logger()
 
+# Поддерживаемые расширения файлов
 SUPPORTED_EXTENSIONS = ('.jpg', '.jpeg', '.arw', '.JPG', '.JPEG', '.ARW')
 
 
@@ -40,7 +42,28 @@ def get_image_files(folder_path: str, progress_callback=None) -> List[ImageFileI
             # Расширение .arw обрабатывается отдельно
             if ext == '.arw':
                 dt = get_datetime_from_image(full_path)
+
+                # Получаем GPS координаты из ARW через exiftool
                 gps = None
+                from logic.config import get_exiftool_path
+                exiftool = get_exiftool_path()
+                if exiftool and os.path.exists(exiftool):
+                    try:
+                        cmd = [exiftool, "-n", "-GPSLatitude",
+                               "-GPSLongitude", "-s3", full_path]
+                        cwd = os.path.dirname(exiftool)
+                        result_gps = subprocess.run(cmd, capture_output=True, text=True,
+                                                    creationflags=subprocess.CREATE_NO_WINDOW, cwd=cwd)
+                        if result_gps.returncode == 0 and result_gps.stdout.strip():
+                            coords = result_gps.stdout.strip().split("\n")
+                            if len(coords) >= 2:
+                                lat = float(coords[0])
+                                lon = float(coords[1])
+                                gps = f"{lat:.6f}, {lon:.6f}"
+                    except Exception as e:
+                        logger.warning(
+                            f"Ошибка при чтении GPS из ARW {file}: {e}")
+
                 result.append(ImageFileInfo(
                     filepath=full_path,
                     filename=file,
@@ -71,10 +94,12 @@ def get_image_files(folder_path: str, progress_callback=None) -> List[ImageFileI
 
 
 def make_table_item(text: str) -> QTableWidgetItem:
+    """Формирует ячейку таблицы из текста"""
     return QTableWidgetItem(text if text else "-")
 
 
 def read_exif(filepath: str) -> dict:
+    """Чтение EXIF-данных из изображения"""
     result = {}
     try:
         with Image.open(filepath) as img:
@@ -86,6 +111,7 @@ def read_exif(filepath: str) -> dict:
                 decoded = TAGS.get(tag, tag)
                 result[decoded] = value
 
+            # Если есть GPS — тоже вытащим
             gps_info = result.get("GPSInfo")
             if gps_info:
                 gps_data = {}
@@ -101,6 +127,7 @@ def read_exif(filepath: str) -> dict:
 
 
 def extract_gps_string(exif: dict) -> Optional[str]:
+    """Преобразует GPSInfo в строку широта, долгота"""
     gps_info = exif.get("GPSInfo", {})
     if not gps_info:
         return None
@@ -118,9 +145,11 @@ def extract_gps_string(exif: dict) -> Optional[str]:
 
 
 def _convert_to_decimal(coord, ref) -> Optional[float]:
+    """Преобразует координаты из формата EXIF DMS -> float"""
     if not coord or not ref:
         return None
     try:
+        # Проверяем тип координат
         if isinstance(coord[0], tuple):
             d = coord[0][0] / coord[0][1]
             m = coord[1][0] / coord[1][1]

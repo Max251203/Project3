@@ -163,12 +163,49 @@ def deg_to_dms_rational(deg_float):
 
 
 def write_gps_to_exif(filepath: str, lat: float, lon: float) -> bool:
+    # Сначала проверим, есть ли уже GPS
+    old_gps = None
+    try:
+        if has_gps_in_exif(filepath):
+            # Получаем текущие координаты
+            from logic.config import get_exiftool_path
+            exiftool = get_exiftool_path()
+            if exiftool and os.path.exists(exiftool):
+                cmd = [exiftool, "-n", "-GPSLatitude",
+                       "-GPSLongitude", "-s3", filepath]
+                cwd = os.path.dirname(exiftool)
+                result = subprocess.run(cmd, capture_output=True, text=True,
+                                        creationflags=subprocess.CREATE_NO_WINDOW, cwd=cwd)
+                if result.returncode == 0 and result.stdout.strip():
+                    coords = result.stdout.strip().split("\n")
+                    if len(coords) >= 2:
+                        old_lat = float(coords[0])
+                        old_lon = float(coords[1])
+                        old_gps = (old_lat, old_lon)
+                        logger.info(
+                            f"Текущие координаты в {os.path.basename(filepath)}: {old_lat:.6f}, {old_lon:.6f}")
+    except Exception as e:
+        logger.warning(f"Не удалось получить текущие координаты: {e}")
+
+    # Записываем новые координаты
     ext = os.path.splitext(filepath)[1].lower()
+    success = False
+
     if ext in [".jpg", ".jpeg"]:
-        return write_gps_to_jpeg(filepath, lat, lon)
+        success = write_gps_to_jpeg(filepath, lat, lon)
     elif ext == ".arw":
-        return write_gps_with_exiftool(filepath, lat, lon)
-    return False
+        success = write_gps_with_exiftool(filepath, lat, lon)
+
+    if success:
+        if old_gps:
+            old_lat, old_lon = old_gps
+            logger.success(
+                f"Координаты в {os.path.basename(filepath)} изменены: {old_lat:.6f}, {old_lon:.6f} → {lat:.6f}, {lon:.6f}")
+        else:
+            logger.success(
+                f"Координаты записаны в {os.path.basename(filepath)}: {lat:.6f}, {lon:.6f}")
+
+    return success
 
 
 def write_gps_to_jpeg(filepath: str, lat: float, lon: float) -> bool:
