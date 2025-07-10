@@ -75,6 +75,15 @@ class MainWindow(QMainWindow):
         self.ui.btnClearLogs.clicked.connect(self.clear_logs)
         self.settings_tab.theme_changed.connect(self.apply_theme)
         self.settings_tab.test_data_requested.connect(self.create_test_data)
+        self.settings_tab.exiftool_status_changed.connect(
+            self.on_exiftool_status_changed)
+
+    def on_exiftool_status_changed(self, is_ready):
+        """Обновляет статус в шапке при изменении статуса ExifTool"""
+        if is_ready:
+            self.update_status("ExifTool готов")
+        else:
+            self.update_status("❗ ExifTool не готов")
 
     def apply_theme(self, theme):
         self.current_theme = theme
@@ -178,21 +187,37 @@ class MainWindow(QMainWindow):
 
         # Проверка ExifTool перед стартом
         from logic.exif_utils import find_exiftool
-        exiftool = find_exiftool()
+        from logic.config import get_exiftool_path
+
+        exiftool = get_exiftool_path()
+        if not exiftool or not os.path.exists(exiftool):
+            exiftool = find_exiftool()
+
         ok = self.settings_tab.update_exiftool_status(exiftool)
 
         if not exiftool or not ok:
-            show_warning(
+            # Предупреждение с возможностью продолжить
+            reply = QMessageBox.question(
                 self,
                 "ExifTool не готов",
-                "⚠️ ExifTool не найден или установлен неправильно.\n"
-                "ARW-файлы не будут обработаны.\n"
-                "Убедитесь, что рядом с exiftool.exe есть папка exiftool_files/"
+                "ExifTool не найден или установлен неправильно.\n"
+                "ARW-файлы не будут обработаны.\n\n"
+                "Продолжить обработку только JPG-файлов?",
+                QMessageBox.Yes | QMessageBox.No,
+                QMessageBox.No
             )
-            self.logger.error(
-                "ExifTool не готов к работе при запуске геотеггинга.")
-            self.update_status("❗ ExifTool не готов к запуску")
-            return
+
+            if reply == QMessageBox.No:
+                self.logger.warning(
+                    "Пользователь отменил обработку из-за отсутствия ExifTool")
+                self.update_status("Обработка отменена")
+                return
+
+            self.logger.warning(
+                "Пользователь продолжил обработку без ExifTool (только JPG)")
+            self.update_status("⚠️ Обработка только JPG")
+        else:
+            self.update_status("ExifTool готов")
 
         correction = self.ui.editTimeCorrection.text().strip() or "0:00"
         self.logger.info(f"Запуск обработки — поправка {correction}")

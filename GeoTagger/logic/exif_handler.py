@@ -14,6 +14,18 @@ logger = get_logger()
 
 
 def process_images(folder_path: str, gpx_path: str, time_correction: str = "0:00", confirm_callback=None) -> tuple[int, int]:
+    """
+    Обрабатывает изображения, добавляя GPS-координаты из GPX-файла.
+
+    Args:
+        folder_path: Путь к папке с изображениями
+        gpx_path: Путь к GPX-файлу
+        time_correction: Поправка времени в формате "±ч:мм"
+        confirm_callback: Функция для подтверждения перезаписи GPS
+
+    Returns:
+        (обновлено, всего): Количество обновленных файлов и общее количество
+    """
     logger.info(f"Начата обработка изображений в: {folder_path}")
     logger.info(f"Используем GPX: {gpx_path}")
     logger.info(f"Поправка времени: {time_correction}")
@@ -23,15 +35,17 @@ def process_images(folder_path: str, gpx_path: str, time_correction: str = "0:00
     if not gpx_data:
         raise Exception("GPX-файл не содержит координат")
 
-    files = [f for f in os.listdir(
-        folder_path) if f.lower().endswith(SUPPORTED_EXTENSIONS)]
+    files = [
+        f for f in os.listdir(folder_path)
+        if f.lower().endswith(SUPPORTED_EXTENSIONS)
+    ]
     total = len(files)
     updated = 0
     global_action = None  # overwrite_all, skip_all
 
     logger.info(f"Найдено {total} изображений для обработки")
 
-    for filename in files:
+    for i, filename in enumerate(files):
         filepath = os.path.join(folder_path, filename)
         dt_original = get_datetime_from_image(filepath)
 
@@ -60,9 +74,10 @@ def process_images(folder_path: str, gpx_path: str, time_correction: str = "0:00
 
                 if action == "cancel":
                     logger.warning("Пользователь отменил обработку")
+                    # Немедленно прерываем обработку
                     return updated, total
                 elif action == "overwrite":
-                    pass
+                    pass  # Продолжаем запись
                 elif action == "skip":
                     continue
                 elif action == "overwrite_all":

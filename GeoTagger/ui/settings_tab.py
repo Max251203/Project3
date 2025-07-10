@@ -16,6 +16,7 @@ logger = get_logger()
 class SettingsTab(QWidget):
     theme_changed = Signal(str)
     test_data_requested = Signal()
+    exiftool_status_changed = Signal(bool)  # True если ExifTool готов
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -84,51 +85,11 @@ class SettingsTab(QWidget):
     def _create_test_data(self):
         self.test_data_requested.emit()
 
-    # def update_exiftool_status(self, path):
-    #     """
-    #     Обновляет label в настройках.
-    #     Возвращает True если всё хорошо, иначе False
-    #     """
-    #     from logic.config import set_exiftool_path
-    #     try:
-    #         if path:
-    #             folder = os.path.dirname(path)
-    #             files_dir = os.path.join(folder, "exiftool_files")
-    #             if not os.path.isdir(files_dir):
-    #                 self.exiftool_label.setText("❌ Нет папки exiftool_files")
-    #                 self.exiftool_label.setStyleSheet("color: red;")
-    #                 logger.error(
-    #                     "Папка exiftool_files не найдена рядом с exiftool.")
-    #                 return False
-
-    #             result = subprocess.run([path, "-ver"],
-    #                                     capture_output=True, text=True)
-    #             version = result.stdout.strip()
-    #             set_exiftool_path(path)
-    #             self.exiftool_label.setText(f"Найден (v{version})")
-    #             self.exiftool_label.setStyleSheet("color: green;")
-    #             logger.info(f"Запуск exiftool успешен: {version}")
-    #             return True
-    #     except Exception as e:
-    #         self.exiftool_label.setText(f"❌ Ошибка запуска ExifTool")
-    #         self.exiftool_label.setStyleSheet("color: red;")
-    #         logger.error(f"Ошибка запуска exiftool: {e}")
-    #     self.exiftool_label.setText("❌ Не найден")
-    #     self.exiftool_label.setStyleSheet("color: red;")
-    #     return False
-
     def update_exiftool_status(self, path):
         """
         Обновляет label в настройках.
         Возвращает True если всё хорошо, иначе False
         """
-        # ТЕСТ: Показать MessageBox при вызове
-        QMessageBox.information(
-            self,
-            "update_exiftool_status вызван",
-            f"Путь: {path}"
-        )
-
         from logic.config import set_exiftool_path
         try:
             if path:
@@ -137,11 +98,9 @@ class SettingsTab(QWidget):
                 if not os.path.isdir(files_dir):
                     self.exiftool_label.setText("❌ Нет папки exiftool_files")
                     self.exiftool_label.setStyleSheet("color: red;")
-                    QMessageBox.critical(
-                        self,
-                        "Папка не найдена",
-                        f"Папка exiftool_files не найдена в {folder}"
-                    )
+                    logger.error(
+                        "Папка exiftool_files не найдена рядом с exiftool.")
+                    self.exiftool_status_changed.emit(False)
                     return False
 
                 result = subprocess.run([path, "-ver"],
@@ -150,57 +109,24 @@ class SettingsTab(QWidget):
                 set_exiftool_path(path)
                 self.exiftool_label.setText(f"Найден (v{version})")
                 self.exiftool_label.setStyleSheet("color: green;")
-                QMessageBox.information(
-                    self,
-                    "ExifTool найден",
-                    f"Версия: {version}"
-                )
+                logger.info(f"Запуск exiftool успешен: {version}")
+                self.exiftool_status_changed.emit(True)
                 return True
         except Exception as e:
             self.exiftool_label.setText(f"❌ Ошибка запуска ExifTool")
             self.exiftool_label.setStyleSheet("color: red;")
-            QMessageBox.critical(
-                self,
-                "Ошибка запуска",
-                f"Ошибка: {e}"
-            )
+            logger.error(f"Ошибка запуска exiftool: {e}")
+            self.exiftool_status_changed.emit(False)
         self.exiftool_label.setText("❌ Не найден")
         self.exiftool_label.setStyleSheet("color: red;")
+        self.exiftool_status_changed.emit(False)
         return False
 
-    # def select_exiftool(self):
-    #     path, _ = QFileDialog.getOpenFileName(
-    #         self, "Выберите exiftool.exe", filter="ExifTool (exiftool*.exe)"
-    #     )
-    #     if path and os.path.isfile(path):
-    #         ok = self.update_exiftool_status(path)
-    #         if not ok:
-    #             QMessageBox.critical(
-    #                 self,
-    #                 "ExifTool не работает",
-    #                 "ExifTool не запущен или рядом с ним нет папки exiftool_files/.\n"
-    #                 "Обработка RAW (ARW) файлов будет недоступна.",
-    #             )
-    #     else:
-    #         QMessageBox.warning(
-    #             self,
-    #             "Путь не выбран",
-    #             "Вы не выбрали файл exiftool.exe.",
-    #         )
     def select_exiftool(self):
         path, _ = QFileDialog.getOpenFileName(
             self, "Выберите exiftool.exe", filter="ExifTool (exiftool*.exe)"
         )
         if path and os.path.isfile(path):
-            # ТЕСТ: Показать MessageBox с выбранным путём
-            QMessageBox.information(
-                self,
-                "Выбран путь",
-                f"Выбран путь: {path}\n"
-                f"Папка: {os.path.dirname(path)}\n"
-                f"Папка exiftool_files существует: {os.path.exists(os.path.join(os.path.dirname(path), 'exiftool_files'))}"
-            )
-
             ok = self.update_exiftool_status(path)
             if not ok:
                 QMessageBox.critical(
