@@ -340,22 +340,6 @@ class MainWindow(QMainWindow):
             show_error(self, "Ошибка",
                        "Не удалось записать координаты в ARW файл")
 
-    def on_geotagging_done(self, result):
-        updated, total = result
-        msg = f"Геометки добавлены в {updated} из {total} файлов"
-        self.logger.success(msg)
-        self.update_status("Обработка завершена")
-
-        # Проверяем, были ли изменены координаты
-        if updated > 0:
-            show_info(self, "Готово",
-                      f"{msg}\n\nПроверьте лог для деталей изменений.")
-        else:
-            show_info(self, "Готово", msg)
-
-        self.refresh_logs()
-        self.load_images(self.image_folder)
-
 
 if __name__ == "__main__":
     app = QApplication(sys.argv)

@@ -59,13 +59,12 @@ class SettingsTab(QWidget):
         self.select_exiftool_button = QPushButton("Выбрать exiftool вручную")
         self.select_exiftool_button.setIcon(QIcon(":/icons/folder.png"))
 
-        # -------------------
         self.test_arw_button = QPushButton("Тест записи в ARW")
-        button_layout.addWidget(self.test_arw_button)
-        # -------------------
+        self.test_arw_button.setIcon(QIcon(":/icons/run.png"))
 
         button_layout.addWidget(self.create_test_data_button)
         button_layout.addWidget(self.select_exiftool_button)
+        button_layout.addWidget(self.test_arw_button)
         button_layout.addStretch()
 
         app_layout.addLayout(button_layout)
@@ -76,8 +75,8 @@ class SettingsTab(QWidget):
         self.theme_combo.currentTextChanged.connect(self._change_theme)
         self.create_test_data_button.clicked.connect(self._create_test_data)
         self.select_exiftool_button.clicked.connect(self.select_exiftool)
-        # ---------------
-        self.test_arw_button.clicked.connect(self.parent().test_arw_write)
+        self.test_arw_button.clicked.connect(
+            lambda: self.parent().test_arw_write())
 
     def _change_theme(self, theme_name):
         theme = "dark" if theme_name == "Темная" else "light"
