@@ -25,12 +25,10 @@ class SettingsTab(QWidget):
     def _build_ui(self):
         layout = QVBoxLayout(self)
         layout.setContentsMargins(10, 10, 10, 10)
-
         self.setObjectName("settingsTab")
 
         self.ui_group = QGroupBox("Настройки интерфейса")
         ui_layout = QVBoxLayout(self.ui_group)
-
         theme_layout = QFormLayout()
         self.theme_combo = QComboBox()
         self.theme_combo.addItems(["Темная", "Светлая"])
@@ -40,7 +38,7 @@ class SettingsTab(QWidget):
 
         layout.addWidget(self.ui_group)
 
-        self.app_group = QGroupBox("Настройки приложения")
+        self.app_group = QGroupBox("ExifTool")
         app_layout = QVBoxLayout(self.app_group)
 
         info_layout = QFormLayout()
@@ -48,22 +46,23 @@ class SettingsTab(QWidget):
         info_layout.addRow("Версия:", self.version_label)
 
         self.exiftool_label = QLabel("Не найден")
-        info_layout.addRow("ExifTool:", self.exiftool_label)
+        self.exiftool_label.setStyleSheet("color: red;")
+        info_layout.addRow("Статус:", self.exiftool_label)
 
         app_layout.addLayout(info_layout)
 
-        test_layout = QHBoxLayout()
+        button_layout = QHBoxLayout()
         self.create_test_data_button = QPushButton("Создать тестовые данные")
         self.create_test_data_button.setIcon(QIcon(":/icons/folder.png"))
 
         self.select_exiftool_button = QPushButton("Выбрать exiftool вручную")
         self.select_exiftool_button.setIcon(QIcon(":/icons/folder.png"))
 
-        test_layout.addWidget(self.create_test_data_button)
-        test_layout.addWidget(self.select_exiftool_button)
-        test_layout.addStretch()
+        button_layout.addWidget(self.create_test_data_button)
+        button_layout.addWidget(self.select_exiftool_button)
+        button_layout.addStretch()
 
-        app_layout.addLayout(test_layout)
+        app_layout.addLayout(button_layout)
         layout.addWidget(self.app_group)
         layout.addStretch()
 
@@ -85,31 +84,134 @@ class SettingsTab(QWidget):
     def _create_test_data(self):
         self.test_data_requested.emit()
 
+    # def update_exiftool_status(self, path):
+    #     """
+    #     Обновляет label в настройках.
+    #     Возвращает True если всё хорошо, иначе False
+    #     """
+    #     from logic.config import set_exiftool_path
+    #     try:
+    #         if path:
+    #             folder = os.path.dirname(path)
+    #             files_dir = os.path.join(folder, "exiftool_files")
+    #             if not os.path.isdir(files_dir):
+    #                 self.exiftool_label.setText("❌ Нет папки exiftool_files")
+    #                 self.exiftool_label.setStyleSheet("color: red;")
+    #                 logger.error(
+    #                     "Папка exiftool_files не найдена рядом с exiftool.")
+    #                 return False
+
+    #             result = subprocess.run([path, "-ver"],
+    #                                     capture_output=True, text=True)
+    #             version = result.stdout.strip()
+    #             set_exiftool_path(path)
+    #             self.exiftool_label.setText(f"Найден (v{version})")
+    #             self.exiftool_label.setStyleSheet("color: green;")
+    #             logger.info(f"Запуск exiftool успешен: {version}")
+    #             return True
+    #     except Exception as e:
+    #         self.exiftool_label.setText(f"❌ Ошибка запуска ExifTool")
+    #         self.exiftool_label.setStyleSheet("color: red;")
+    #         logger.error(f"Ошибка запуска exiftool: {e}")
+    #     self.exiftool_label.setText("❌ Не найден")
+    #     self.exiftool_label.setStyleSheet("color: red;")
+    #     return False
+
     def update_exiftool_status(self, path):
+        """
+        Обновляет label в настройках.
+        Возвращает True если всё хорошо, иначе False
+        """
+        # ТЕСТ: Показать MessageBox при вызове
+        QMessageBox.information(
+            self,
+            "update_exiftool_status вызван",
+            f"Путь: {path}"
+        )
+
+        from logic.config import set_exiftool_path
         try:
             if path:
-                result = subprocess.run(
-                    [path, "-ver"], capture_output=True, text=True)
+                folder = os.path.dirname(path)
+                files_dir = os.path.join(folder, "exiftool_files")
+                if not os.path.isdir(files_dir):
+                    self.exiftool_label.setText("❌ Нет папки exiftool_files")
+                    self.exiftool_label.setStyleSheet("color: red;")
+                    QMessageBox.critical(
+                        self,
+                        "Папка не найдена",
+                        f"Папка exiftool_files не найдена в {folder}"
+                    )
+                    return False
+
+                result = subprocess.run([path, "-ver"],
+                                        capture_output=True, text=True)
                 version = result.stdout.strip()
+                set_exiftool_path(path)
                 self.exiftool_label.setText(f"Найден (v{version})")
                 self.exiftool_label.setStyleSheet("color: green;")
-                set_exiftool_path(path)
-                logger.info(f"Выбран exiftool вручную: {path}")
-                return path
+                QMessageBox.information(
+                    self,
+                    "ExifTool найден",
+                    f"Версия: {version}"
+                )
+                return True
         except Exception as e:
-            self.exiftool_label.setText(f"Ошибка запуска: {e}")
+            self.exiftool_label.setText(f"❌ Ошибка запуска ExifTool")
             self.exiftool_label.setStyleSheet("color: red;")
-            logger.error(f"Ошибка запуска exiftool: {e}")
-        self.exiftool_label.setText("Не найден")
+            QMessageBox.critical(
+                self,
+                "Ошибка запуска",
+                f"Ошибка: {e}"
+            )
+        self.exiftool_label.setText("❌ Не найден")
         self.exiftool_label.setStyleSheet("color: red;")
-        return None
+        return False
 
+    # def select_exiftool(self):
+    #     path, _ = QFileDialog.getOpenFileName(
+    #         self, "Выберите exiftool.exe", filter="ExifTool (exiftool*.exe)"
+    #     )
+    #     if path and os.path.isfile(path):
+    #         ok = self.update_exiftool_status(path)
+    #         if not ok:
+    #             QMessageBox.critical(
+    #                 self,
+    #                 "ExifTool не работает",
+    #                 "ExifTool не запущен или рядом с ним нет папки exiftool_files/.\n"
+    #                 "Обработка RAW (ARW) файлов будет недоступна.",
+    #             )
+    #     else:
+    #         QMessageBox.warning(
+    #             self,
+    #             "Путь не выбран",
+    #             "Вы не выбрали файл exiftool.exe.",
+    #         )
     def select_exiftool(self):
         path, _ = QFileDialog.getOpenFileName(
             self, "Выберите exiftool.exe", filter="ExifTool (exiftool*.exe)"
         )
-        if path and os.path.exists(path):
-            self.update_exiftool_status(path)
+        if path and os.path.isfile(path):
+            # ТЕСТ: Показать MessageBox с выбранным путём
+            QMessageBox.information(
+                self,
+                "Выбран путь",
+                f"Выбран путь: {path}\n"
+                f"Папка: {os.path.dirname(path)}\n"
+                f"Папка exiftool_files существует: {os.path.exists(os.path.join(os.path.dirname(path), 'exiftool_files'))}"
+            )
+
+            ok = self.update_exiftool_status(path)
+            if not ok:
+                QMessageBox.critical(
+                    self,
+                    "ExifTool не работает",
+                    "ExifTool не запущен или рядом с ним нет папки exiftool_files/.\n"
+                    "Обработка RAW (ARW) файлов будет недоступна.",
+                )
         else:
             QMessageBox.warning(
-                self, "Ошибка", "Не удалось выбрать файл exiftool")
+                self,
+                "Путь не выбран",
+                "Вы не выбрали файл exiftool.exe.",
+            )

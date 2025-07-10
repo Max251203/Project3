@@ -175,10 +175,15 @@ def write_gps_to_jpeg(filepath: str, lat: float, lon: float) -> bool:
 
 
 def write_gps_with_exiftool(filepath: str, lat: float, lon: float) -> bool:
-    exiftool = find_exiftool()
-    if not exiftool:
+    from logic.config import get_exiftool_path
+
+    # Используем СОХРАНЁННЫЙ путь, а не ищем заново
+    exiftool = get_exiftool_path()
+
+    if not exiftool or not os.path.exists(exiftool):
         logger.error("ExifTool не найден для записи в ARW")
         return False
+
     try:
         cmd = [
             exiftool,
@@ -189,35 +194,57 @@ def write_gps_with_exiftool(filepath: str, lat: float, lon: float) -> bool:
             "-overwrite_original",
             filepath
         ]
+
+        # Используем папку exiftool как рабочую директорию
+        cwd = os.path.dirname(exiftool)
+
         result = subprocess.run(
-            cmd, capture_output=True, text=True, creationflags=subprocess.CREATE_NO_WINDOW)
+            cmd,
+            capture_output=True,
+            text=True,
+            creationflags=subprocess.CREATE_NO_WINDOW,
+            cwd=cwd
+        )
+
         if result.returncode != 0:
             logger.error(f"ExifTool ошибка: {result.stderr.strip()}")
             return False
         return True
     except Exception as e:
-        logger.error(f"Ошибка при записи в ARW: {e}")
+        logger.error(f"Ошибка при записи в ARW {filepath}: {e}")
         return False
 
 
 def has_gps_in_exif(filepath: str) -> bool:
+    from logic.config import get_exiftool_path
+
     ext = os.path.splitext(filepath)[1].lower()
-    if ext in [".jpg", ".jpeg"]:
+    if ext in ['.jpg', '.jpeg']:
         try:
+            import piexif
             exif_dict = piexif.load(filepath)
             return bool(exif_dict.get("GPS"))
         except Exception:
             return False
-    elif ext == ".arw":
-        exiftool = find_exiftool()
-        if not exiftool:
+    elif ext == '.arw':
+        # Используем СОХРАНЁННЫЙ путь
+        exiftool = get_exiftool_path()
+
+        if not exiftool or not os.path.exists(exiftool):
             return False
         try:
+            cmd = [exiftool, "-s", "-GPSLatitude", "-GPSLongitude", filepath]
+            cwd = os.path.dirname(exiftool)
+
             result = subprocess.run(
-                [exiftool, "-GPSLatitude", "-GPSLongitude", "-s", filepath],
-                capture_output=True, text=True, creationflags=subprocess.CREATE_NO_WINDOW
+                cmd,
+                capture_output=True,
+                text=True,
+                creationflags=subprocess.CREATE_NO_WINDOW,
+                cwd=cwd
             )
-            return "GPSLatitude" in result.stdout and "GPSLongitude" in result.stdout
+
+            return "GPSLatitude" in result.stdout or "GPSLongitude" in result.stdout
         except Exception:
             return False
     return False

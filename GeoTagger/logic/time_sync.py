@@ -32,12 +32,16 @@ def get_datetime_from_image(filepath: str) -> datetime | None:
             logger.error("❌ Не найден ExifTool для чтения даты из .ARW файла")
             return None
         try:
-            result = subprocess.run(
-                [exiftool, "-DateTimeOriginal", "-s3", filepath],
-                capture_output=True,
-                text=True,
-                creationflags=subprocess.CREATE_NO_WINDOW
-            )
+            cmd = [exiftool, "-DateTimeOriginal", "-s3", filepath]
+            cwd = os.path.dirname(exiftool) if os.path.isfile(
+                exiftool) else None
+
+            result = subprocess.run(cmd,
+                                    capture_output=True,
+                                    text=True,
+                                    creationflags=subprocess.CREATE_NO_WINDOW,
+                                    cwd=cwd)
+
             dt_str = result.stdout.strip()
             if result.returncode != 0:
                 logger.error(

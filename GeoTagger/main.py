@@ -2,7 +2,7 @@ import sys
 import os
 
 from PySide6.QtWidgets import (
-    QApplication, QMainWindow, QFileDialog, QHeaderView, QTableWidgetItem
+    QApplication, QMainWindow, QFileDialog, QHeaderView, QTableWidgetItem, QMessageBox
 )
 from PySide6.QtCore import QFile, QTextStream
 from PySide6.QtGui import QIcon
@@ -36,6 +36,8 @@ class MainWindow(QMainWindow):
         self.current_theme = "dark"
         self.active_threads = []
 
+        load_exiftool_path_from_file()
+
         self.setup_ui()
         self.connect_signals()
         self.apply_theme(self.current_theme)
@@ -45,31 +47,26 @@ class MainWindow(QMainWindow):
     def setup_ui(self):
         self.setWindowTitle("GeoTagger")
         self.setMinimumSize(900, 600)
+
         self.ui.tableFiles.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
         self.ui.statusLabel.setText("")
 
         self.settings_tab = SettingsTab(self)
         self.ui.verticalLayoutSettings.addWidget(self.settings_tab)
 
-        # ✅ Загружаем путь из файла (если есть)
-        load_exiftool_path_from_file()
-        path = get_exiftool_path()
-
-        if path and os.path.exists(path):
-            self.settings_tab.update_exiftool_status(path)
-            self.logger.info(f"ExifTool готов к работе: {path}")
-            self.update_status("")
+        # Проверка exiftool при запуске
+        exiftool_path = get_exiftool_path()
+        if exiftool_path and os.path.exists(exiftool_path):
+            ok = self.settings_tab.update_exiftool_status(exiftool_path)
+            if not ok:
+                self.update_status("❗ ExifTool найден, но не готов")
         else:
-            from logic.exif_utils import find_exiftool
-            found = find_exiftool()
-            self.settings_tab.update_exiftool_status(found)
-
-            if not found:
-                self.logger.error(
-                    "ExifTool не найден. Обработка RAW будет невозможна.")
+            guess = find_exiftool()
+            ok = self.settings_tab.update_exiftool_status(guess)
+            if not ok:
+                self.logger.warning(
+                    "ExifTool не найден. ARW будет недоступен.")
                 self.update_status("❗ ExifTool не найден")
-            else:
-                self.update_status("")
 
     def connect_signals(self):
         self.ui.btnSelectFolder.clicked.connect(self.select_folder)
@@ -177,6 +174,24 @@ class MainWindow(QMainWindow):
         if not self.image_folder or not self.gpx_file_path:
             show_warning(self, "Ошибка",
                          "Выберите папку и GPX-файл перед запуском")
+            return
+
+        # Проверка ExifTool перед стартом
+        from logic.exif_utils import find_exiftool
+        exiftool = find_exiftool()
+        ok = self.settings_tab.update_exiftool_status(exiftool)
+
+        if not exiftool or not ok:
+            show_warning(
+                self,
+                "ExifTool не готов",
+                "⚠️ ExifTool не найден или установлен неправильно.\n"
+                "ARW-файлы не будут обработаны.\n"
+                "Убедитесь, что рядом с exiftool.exe есть папка exiftool_files/"
+            )
+            self.logger.error(
+                "ExifTool не готов к работе при запуске геотеггинга.")
+            self.update_status("❗ ExifTool не готов к запуску")
             return
 
         correction = self.ui.editTimeCorrection.text().strip() or "0:00"
